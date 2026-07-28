@@ -1,0 +1,3094 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MVMap — Metroidvania Map Editor</title>
+    <style>
+      /* ══════════════════════════════════════════════════════════════
+         Theme
+         ══════════════════════════════════════════════════════════════ */
+      :root {
+        --bg: #12151b;
+        --bg-2: #171b23;
+        --bg-3: #1e232d;
+        --line: #2a3140;
+        --line-2: #384154;
+        --tx: #d7dde8;
+        --tx-dim: #8b95a7;
+        --tx-mute: #626c7e;
+        --acc: #5aa9f0;
+        --acc-2: #2b6fae;
+        --danger: #e0555f;
+        --ok: #3fb27f;
+        --radius: 6px;
+        --font: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+        --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        background: var(--bg);
+        color: var(--tx);
+        font: 13px/1.45 var(--font);
+        -webkit-font-smoothing: antialiased;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+      }
+      input,
+      select,
+      textarea {
+        font: inherit;
+        color: inherit;
+      }
+
+      /* ══════════════════════════════════════════════════════════════
+         Layout
+         ══════════════════════════════════════════════════════════════ */
+      #app {
+        display: grid;
+        grid-template-columns: 224px 1fr 274px;
+        grid-template-rows: 42px 1fr;
+        height: 100vh;
+      }
+
+      .topbar {
+        grid-column: 1 / 4;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 10px;
+        background: var(--bg-2);
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        font-weight: 650;
+        letter-spacing: 0.3px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #eaf0fa;
+        user-select: none;
+      }
+      .brand-mark {
+        color: var(--acc);
+        font-size: 15px;
+      }
+      .map-name {
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 4px 9px;
+        width: 210px;
+        outline: none;
+      }
+      .map-name:focus {
+        border-color: var(--acc-2);
+      }
+      .spacer {
+        flex: 1;
+      }
+      .topbar-group {
+        display: flex;
+        gap: 4px;
+      }
+      .tb {
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 4px 9px;
+        color: var(--tx-dim);
+        line-height: 1.3;
+      }
+      .tb:hover {
+        background: #262d39;
+        color: var(--tx);
+        border-color: var(--line-2);
+      }
+      .tb:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .tb:disabled:hover {
+        background: var(--bg-3);
+        color: var(--tx-dim);
+        border-color: var(--line);
+      }
+      .save-status {
+        font-size: 11px;
+        color: var(--tx-mute);
+        min-width: 52px;
+        text-align: right;
+        user-select: none;
+      }
+      .save-status.dirty {
+        color: #c9a227;
+      }
+
+      .panel {
+        background: var(--bg-2);
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .panel-left {
+        border-right: 1px solid var(--line);
+      }
+      .panel-right {
+        border-left: 1px solid var(--line);
+      }
+
+      .sect {
+        border-bottom: 1px solid var(--line);
+        padding: 8px;
+        flex: none;
+      }
+      .sect.grow {
+        flex: 1 1 auto;
+        min-height: 90px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .sect-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+      .sect-head h3 {
+        margin: 0;
+        font-size: 10.5px;
+        letter-spacing: 0.9px;
+        text-transform: uppercase;
+        color: var(--tx-mute);
+        font-weight: 650;
+      }
+      .count {
+        font-size: 10.5px;
+        color: var(--tx-mute);
+        font-variant-numeric: tabular-nums;
+      }
+      .mini {
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        width: 20px;
+        height: 20px;
+        line-height: 1;
+        padding: 0;
+        color: var(--tx-dim);
+        font-size: 13px;
+      }
+      .mini:hover {
+        color: var(--tx);
+        border-color: var(--line-2);
+      }
+      .mini.wide {
+        width: auto;
+        padding: 0 8px;
+        font-size: 11px;
+      }
+
+      /* ── Tools ─────────────────────────────────────────────────── */
+      .tools {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding: 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      .tool {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 6px 7px;
+        color: var(--tx-dim);
+        font-size: 11.5px;
+        text-align: left;
+      }
+      .tool .glyph {
+        font-size: 13px;
+        width: 14px;
+        text-align: center;
+      }
+      .tool:hover {
+        color: var(--tx);
+        border-color: var(--line-2);
+      }
+      .tool.on {
+        background: #21344a;
+        border-color: var(--acc-2);
+        color: #cfe6ff;
+      }
+      .tool.sm {
+        padding: 4px 8px;
+        font-size: 11.5px;
+      }
+
+      /* ── Lists ─────────────────────────────────────────────────── */
+      .list {
+        overflow-y: auto;
+        flex: 1;
+        margin: -2px;
+        padding: 2px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 4px 6px;
+        border-radius: 5px;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .row:hover {
+        background: var(--bg-3);
+      }
+      .row.on {
+        background: #21344a;
+        border-color: var(--acc-2);
+      }
+      .row .nm {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .sub {
+        font-size: 10.5px;
+        color: var(--tx-mute);
+        font-variant-numeric: tabular-nums;
+      }
+      .grp {
+        padding: 6px 6px 2px;
+        font-size: 10px;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        font-weight: 650;
+      }
+      .swatch {
+        width: 11px;
+        height: 11px;
+        border-radius: 3px;
+        flex: none;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+      }
+      .swatch.rnd {
+        border-radius: 50%;
+      }
+      .empty {
+        color: var(--tx-mute);
+        font-size: 11.5px;
+        padding: 6px 4px;
+        font-style: italic;
+      }
+
+      .area-list .row {
+        padding: 3px 6px;
+      }
+      .area-list input.nm-edit {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        padding: 0;
+        min-width: 0;
+      }
+      .area-list input.nm-edit:focus {
+        background: var(--bg);
+        border-radius: 3px;
+        padding: 0 3px;
+      }
+
+      /* ── Checkboxes ────────────────────────────────────────────── */
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 3px 2px;
+        cursor: pointer;
+        color: var(--tx-dim);
+        font-size: 11.5px;
+      }
+      .check:hover {
+        color: var(--tx);
+      }
+      .check input {
+        accent-color: var(--acc);
+        margin: 0;
+      }
+
+      /* ── Stage ─────────────────────────────────────────────────── */
+      .stage {
+        position: relative;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      #world,
+      #detail-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+      .hud {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        background: rgba(18, 21, 27, 0.85);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 3px 8px;
+        font-size: 11px;
+        color: var(--tx-mute);
+        font-variant-numeric: tabular-nums;
+        backdrop-filter: blur(4px);
+        user-select: none;
+      }
+      .hud .sep {
+        opacity: 0.5;
+      }
+      .hint {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 10px;
+        background: rgba(18, 21, 27, 0.85);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 3px 10px;
+        font-size: 11px;
+        color: var(--tx-mute);
+        pointer-events: none;
+        backdrop-filter: blur(4px);
+        white-space: nowrap;
+      }
+      .hint kbd {
+        font: 10px var(--mono);
+        background: var(--bg-3);
+        border: 1px solid var(--line-2);
+        border-radius: 3px;
+        padding: 0 4px;
+        color: var(--tx-dim);
+      }
+
+      /* ── Inspector ─────────────────────────────────────────────── */
+      .inspector {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .fld {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .fld > label {
+        font-size: 10.5px;
+        color: var(--tx-mute);
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+      }
+      .fld input[type="text"],
+      .fld select,
+      .fld textarea {
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 4px 7px;
+        outline: none;
+        width: 100%;
+      }
+      .fld input[type="text"]:focus,
+      .fld select:focus,
+      .fld textarea:focus {
+        border-color: var(--acc-2);
+      }
+      .fld textarea {
+        resize: vertical;
+        min-height: 48px;
+        font: 12px/1.4 var(--font);
+      }
+      .insp-title {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-weight: 620;
+        padding-bottom: 2px;
+      }
+      .insp-title .kind {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.9px;
+        color: var(--tx-mute);
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .chip {
+        width: 17px;
+        height: 17px;
+        border-radius: 4px;
+        border: 1px solid rgba(0, 0, 0, 0.5);
+        padding: 0;
+      }
+      .chip.on {
+        outline: 2px solid var(--tx);
+        outline-offset: 1px;
+      }
+      .seg {
+        display: flex;
+        gap: 3px;
+      }
+      .seg button {
+        flex: 1;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 3px 4px;
+        font-size: 11px;
+        color: var(--tx-dim);
+      }
+      .seg button.on {
+        background: #21344a;
+        border-color: var(--acc-2);
+        color: #cfe6ff;
+      }
+      .btn-row {
+        display: flex;
+        gap: 4px;
+      }
+      .btn {
+        flex: 1;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 5px;
+        color: var(--tx-dim);
+        font-size: 11.5px;
+      }
+      .btn:hover {
+        color: var(--tx);
+        border-color: var(--line-2);
+      }
+      .btn.primary {
+        background: #21344a;
+        border-color: var(--acc-2);
+        color: #cfe6ff;
+      }
+      .btn.danger:hover {
+        color: #ffd7d9;
+        border-color: var(--danger);
+        background: #3a1f22;
+      }
+      .link-list {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        max-height: 150px;
+        overflow-y: auto;
+      }
+      .meta {
+        font-size: 11px;
+        color: var(--tx-mute);
+      }
+
+      /* ── Detail overlay ────────────────────────────────────────── */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+      }
+      .overlay[hidden] {
+        display: none;
+      }
+      .detail-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 10px;
+        height: 42px;
+        background: var(--bg-2);
+        border-bottom: 1px solid var(--line);
+      }
+      .detail-tools {
+        display: flex;
+        gap: 4px;
+      }
+      .detail-types {
+        display: flex;
+        gap: 3px;
+        flex-wrap: wrap;
+      }
+      .ty {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 3px 7px;
+        font-size: 11px;
+        color: var(--tx-dim);
+      }
+      .ty.on {
+        border-color: var(--tx-dim);
+        color: var(--tx);
+      }
+      .detail-stage {
+        position: relative;
+        flex: 1;
+        overflow: hidden;
+      }
+      .detail-inspector {
+        position: absolute;
+        right: 12px;
+        top: 12px;
+        width: 210px;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 9px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
+      }
+      .inline {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--tx-mute);
+      }
+      .inline select {
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 3px 5px;
+        outline: none;
+      }
+
+      /* ── Modal ─────────────────────────────────────────────────── */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        background: rgba(6, 8, 12, 0.68);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(2px);
+      }
+      .modal-backdrop[hidden] {
+        display: none;
+      }
+      .modal {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px;
+        width: min(620px, 92vw);
+        max-height: 84vh;
+        overflow-y: auto;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+      }
+      .modal h2 {
+        margin: 0 0 4px;
+        font-size: 16px;
+      }
+      .modal h3 {
+        margin: 16px 0 6px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.9px;
+        color: var(--tx-mute);
+      }
+      .modal p {
+        color: var(--tx-dim);
+        margin: 0 0 9px;
+      }
+      .modal .close-row {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 14px;
+      }
+      .kbd-grid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 12px;
+        font-size: 12px;
+        color: var(--tx-dim);
+      }
+      .kbd-grid b {
+        font: 11px var(--mono);
+        color: var(--tx);
+        background: var(--bg-3);
+        border: 1px solid var(--line-2);
+        border-radius: 3px;
+        padding: 0 5px;
+        justify-self: start;
+      }
+      .map-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        margin-bottom: 5px;
+      }
+      .map-row .nm {
+        flex: 1;
+      }
+      .map-row .sub {
+        font-size: 11px;
+        color: var(--tx-mute);
+      }
+
+      /* ── file:// notice ────────────────────────────────────────── */
+      #file-note {
+        position: fixed;
+        z-index: 70;
+        left: 50%;
+        bottom: 14px;
+        transform: translateX(-50%);
+        background: #3a2f18;
+        border: 1px solid #6b5620;
+        color: #f0dfae;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        display: none;
+      }
+      #file-note.show {
+        display: block;
+      }
+
+      ::-webkit-scrollbar {
+        width: 9px;
+        height: 9px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #2e3644;
+        border-radius: 5px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #3a4454;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="app">
+      <!-- ── Top bar ───────────────────────────────────────────────── -->
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">▚</span> MVMap</div>
+        <input id="map-name" class="map-name" type="text" spellcheck="false" aria-label="Map name" />
+        <div class="topbar-group">
+          <button id="btn-undo" class="tb" title="Undo (Ctrl+Z)">↶</button>
+          <button id="btn-redo" class="tb" title="Redo (Ctrl+Shift+Z)">↷</button>
+        </div>
+        <div class="spacer"></div>
+        <div class="topbar-group">
+          <button id="btn-maps" class="tb">Maps…</button>
+          <button id="btn-new" class="tb">New</button>
+          <button id="btn-import" class="tb">Import</button>
+          <button id="btn-export" class="tb">Export</button>
+          <button id="btn-png" class="tb">PNG</button>
+          <button id="btn-help" class="tb" title="Help &amp; shortcuts">?</button>
+        </div>
+        <span id="save-status" class="save-status"></span>
+      </header>
+
+      <!-- ── Left rail ─────────────────────────────────────────────── -->
+      <aside class="panel panel-left">
+        <div class="tools" id="tools">
+          <button class="tool" data-tool="select"><span class="glyph">➤</span><span>Select</span></button>
+          <button class="tool" data-tool="paint"><span class="glyph">▩</span><span>Paint</span></button>
+          <button class="tool" data-tool="rect"><span class="glyph">▭</span><span>Rect</span></button>
+          <button class="tool" data-tool="erase"><span class="glyph">◌</span><span>Erase</span></button>
+          <button class="tool" data-tool="door"><span class="glyph">╫</span><span>Door</span></button>
+          <button class="tool" data-tool="key"><span class="glyph">✦</span><span>Key</span></button>
+          <button class="tool" data-tool="pan"><span class="glyph">✥</span><span>Pan</span></button>
+        </div>
+
+        <section class="sect">
+          <div class="sect-head">
+            <h3>Areas</h3>
+            <button class="mini" id="btn-add-area" title="New area">+</button>
+          </div>
+          <div id="area-list" class="area-list"></div>
+        </section>
+
+        <section class="sect grow">
+          <div class="sect-head">
+            <h3>Rooms</h3>
+            <span class="count" id="room-count">0</span>
+          </div>
+          <div id="room-list" class="list"></div>
+        </section>
+
+        <section class="sect">
+          <label class="check"><input type="checkbox" id="chk-flow" /><span>Show all lock ↔ key links</span></label>
+          <label class="check"><input type="checkbox" id="chk-labels" checked /><span>Show room names</span></label>
+        </section>
+      </aside>
+
+      <!-- ── Stage ─────────────────────────────────────────────────── -->
+      <main class="stage">
+        <canvas id="world"></canvas>
+        <div class="hud">
+          <span id="hud-coord">0, 0</span>
+          <span class="sep">·</span>
+          <span id="hud-zoom">100%</span>
+          <button class="mini wide" id="btn-fit" title="Zoom to fit (F)">fit</button>
+        </div>
+        <div class="hint" id="hint"></div>
+      </main>
+
+      <!-- ── Right rail ────────────────────────────────────────────── -->
+      <aside class="panel panel-right">
+        <section class="sect">
+          <div class="sect-head"><h3>Inspector</h3></div>
+          <div id="inspector" class="inspector"></div>
+        </section>
+
+        <section class="sect grow">
+          <div class="sect-head">
+            <h3>Locks</h3>
+            <button class="mini" id="btn-add-lock" title="New lock">+</button>
+          </div>
+          <div id="lock-list" class="list"></div>
+        </section>
+
+        <section class="sect grow">
+          <div class="sect-head">
+            <h3>Keys</h3>
+            <span class="count" id="key-count">0</span>
+          </div>
+          <div id="key-list" class="list"></div>
+        </section>
+      </aside>
+    </div>
+
+    <!-- ── Greybox overlay ─────────────────────────────────────────── -->
+    <div id="detail" class="overlay" hidden>
+      <div class="detail-bar">
+        <button class="tb" id="detail-close">← Map</button>
+        <strong id="detail-title">Room</strong>
+        <div class="detail-tools" id="detail-tools">
+          <button class="tool sm" data-dtool="box"><span class="glyph">▭</span>Box</button>
+          <button class="tool sm" data-dtool="select"><span class="glyph">➤</span>Select</button>
+          <button class="tool sm" data-dtool="erase"><span class="glyph">◌</span>Erase</button>
+          <button class="tool sm" data-dtool="pan"><span class="glyph">✥</span>Pan</button>
+        </div>
+        <div class="detail-types" id="detail-types"></div>
+        <div class="spacer"></div>
+        <label class="inline"
+          >Subdiv
+          <select id="detail-sub">
+            <option value="4">4×</option>
+            <option value="8">8×</option>
+            <option value="16">16×</option>
+          </select>
+        </label>
+        <button class="tb" id="detail-fit">fit</button>
+      </div>
+      <div class="detail-stage">
+        <canvas id="detail-canvas"></canvas>
+        <div class="detail-inspector" id="detail-inspector" hidden></div>
+      </div>
+    </div>
+
+    <div id="modal" class="modal-backdrop" hidden><div class="modal" id="modal-box"></div></div>
+    <div id="file-note">
+      Running from <code>file://</code> — using localStorage instead of IndexedDB. Export often.
+    </div>
+    <input type="file" id="file-input" accept="application/json,.json" hidden />
+
+    <script>
+      "use strict";
+      (function () {
+        /* ══════════════════════════════════════════════════════════════
+           1 · Utilities
+           ══════════════════════════════════════════════════════════════ */
+        const $ = (s) => document.querySelector(s);
+        const uid = (p) => p + "_" + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
+        const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+        const ck = (x, y) => x + "," + y;
+        const unck = (s) => {
+          const i = s.indexOf(",");
+          return [+s.slice(0, i), +s.slice(i + 1)];
+        };
+        const esc = (s) =>
+          String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+        function hexA(hex, a) {
+          const h = hex.replace("#", "");
+          const n = parseInt(h.length === 3 ? h.replace(/./g, "$&$&") : h, 16);
+          return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+        }
+        function shade(hex, amt) {
+          const h = hex.replace("#", "");
+          const n = parseInt(h.length === 3 ? h.replace(/./g, "$&$&") : h, 16);
+          const f = (v) => clamp(Math.round(v + 255 * amt), 0, 255);
+          return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+        }
+        function saveBlob(blob, filename) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 4000);
+        }
+        const slug = (s) => (s || "map").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "map";
+
+        /* ══════════════════════════════════════════════════════════════
+           2 · Constants
+           ══════════════════════════════════════════════════════════════ */
+        const CELL = 32; // world px per grid cell
+        const DCELL = 22; // detail px per sub-cell
+        const MAJOR = 8; // heavy grid line every N cells
+
+        const AREA_COLORS = [
+          "#4c8dd8", "#3fb27f", "#d8734c", "#a56fd0", "#d8b64c",
+          "#4cc9d8", "#d84c7a", "#6ad84c", "#8b93a6", "#d85c5c",
+        ];
+        const LOCK_COLORS = [
+          "#e0555f", "#f0a13a", "#f0dc3a", "#5ad07a", "#5aa9f0",
+          "#a97af0", "#ef6fb5", "#5fd8cf", "#c9885a", "#9aa4b5",
+        ];
+        const BOX_TYPES = [
+          { id: "solid", name: "Solid", color: "#7c879b" },
+          { id: "platform", name: "Platform", color: "#3fb27f" },
+          { id: "hazard", name: "Hazard", color: "#e0555f" },
+          { id: "water", name: "Water", color: "#4cc9d8" },
+          { id: "ladder", name: "Ladder", color: "#f0a13a" },
+          { id: "exit", name: "Exit", color: "#a56fd0" },
+          { id: "item", name: "Item", color: "#f0dc3a" },
+          { id: "enemy", name: "Enemy", color: "#d84c7a" },
+          { id: "note", name: "Note", color: "#8b93a6" },
+        ];
+        const boxType = (id) => BOX_TYPES.find((t) => t.id === id) || BOX_TYPES[0];
+        const FONTF = `ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif`;
+
+        const HINTS = {
+          select: "Click to select · drag a room to move it · double-click a room to grey-box it · <kbd>Del</kbd> removes",
+          paint: "Drag to paint cells into the active room · <kbd>Alt</kbd> erases · <kbd>Shift</kbd> starts a new room",
+          rect: "Drag a rectangle to fill cells into the active room · <kbd>Alt</kbd> clears the rectangle",
+          erase: "Drag over cells to remove them from their room",
+          door: "Click a cell edge to place a door · click an existing door to edit it · <kbd>Alt</kbd>-click removes",
+          key: "Click a cell to drop a key marker there",
+          pan: "Drag to pan · scroll to zoom · <kbd>F</kbd> zooms to fit",
+        };
+
+        /* ══════════════════════════════════════════════════════════════
+           3 · Document model
+           ══════════════════════════════════════════════════════════════ */
+        // doc.rooms[]  { id, name, areaId, color|null, notes, cells:["x,y",…] }
+        // doc.doors[]  { id, x, y, o:"v"|"h", kind:"passage"|"door"|"oneway", dir:1|-1, lockId|null }
+        //              a "v" edge at (x,y) divides cells (x-1,y) | (x,y)
+        //              an "h" edge at (x,y) divides cells (x,y-1) / (x,y)
+        // doc.locks[]  { id, name, color, keyIds:[] }
+        // doc.keys[]   { id, name, color, x, y }
+        // doc.detail{}  roomId -> { sub, boxes:[{id,x,y,w,h,type,label}] }  coords in sub-cells, absolute
+        function newDoc(name) {
+          const a = { id: uid("area"), name: "Area 1", color: AREA_COLORS[0] };
+          return {
+            id: uid("map"),
+            version: 1,
+            name: name || "Untitled Map",
+            updated: Date.now(),
+            areas: [a],
+            rooms: [],
+            doors: [],
+            locks: [],
+            keys: [],
+            detail: {},
+          };
+        }
+
+        /** Normalise anything loaded from disk/db so missing fields can't crash the editor. */
+        function migrate(d) {
+          const base = newDoc();
+          d = Object.assign({}, base, d || {});
+          d.areas = Array.isArray(d.areas) && d.areas.length ? d.areas : base.areas;
+          d.rooms = Array.isArray(d.rooms) ? d.rooms : [];
+          d.doors = Array.isArray(d.doors) ? d.doors : [];
+          d.locks = Array.isArray(d.locks) ? d.locks : [];
+          d.keys = Array.isArray(d.keys) ? d.keys : [];
+          d.detail = d.detail && typeof d.detail === "object" ? d.detail : {};
+          d.rooms.forEach((r) => {
+            r.cells = Array.isArray(r.cells) ? r.cells : [];
+            if (!d.areas.some((a) => a.id === r.areaId)) r.areaId = d.areas[0].id;
+          });
+          d.locks.forEach((l) => (l.keyIds = Array.isArray(l.keyIds) ? l.keyIds : []));
+          return d;
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           4 · Runtime state
+           ══════════════════════════════════════════════════════════════ */
+        const S = {
+          doc: newDoc(),
+          cam: { x: 0, y: 0, zoom: 1 },
+          tool: "paint",
+          sel: null, // {type:"room"|"door"|"key"|"lock", id}
+          activeRoomId: null,
+          activeAreaId: null,
+          showFlow: false,
+          showLabels: true,
+          hoverCell: null,
+          hoverEdge: null,
+          drag: null,
+          spaceDown: false,
+          detailRoomId: null,
+          dtool: "box",
+          dtype: "solid",
+          dsel: null,
+          dcam: { x: 0, y: 0, zoom: 1 },
+          ddrag: null,
+        };
+
+        let cellIndex = new Map(); // "x,y" -> roomId
+        let doorIndex = new Map(); // "o:x,y" -> door
+        let needsDraw = true;
+        const undoStack = [];
+        const redoStack = [];
+
+        function reindex() {
+          cellIndex = new Map();
+          for (const r of S.doc.rooms) for (const c of r.cells) cellIndex.set(c, r.id);
+          doorIndex = new Map();
+          for (const d of S.doc.doors) doorIndex.set(d.o + ":" + d.x + "," + d.y, d);
+        }
+        const roomById = (id) => S.doc.rooms.find((r) => r.id === id) || null;
+        const areaById = (id) => S.doc.areas.find((a) => a.id === id) || S.doc.areas[0];
+        const lockById = (id) => S.doc.locks.find((l) => l.id === id) || null;
+        const keyById = (id) => S.doc.keys.find((k) => k.id === id) || null;
+        const roomAtCell = (x, y) => roomById(cellIndex.get(ck(x, y)));
+        const doorAtEdge = (o, x, y) => doorIndex.get(o + ":" + x + "," + y) || null;
+        const roomColor = (r) => (r && (r.color || areaById(r.areaId).color)) || AREA_COLORS[0];
+
+        function activeRoom() {
+          let r = roomById(S.activeRoomId);
+          if (!r && S.sel && S.sel.type === "room") r = roomById(S.sel.id);
+          return r;
+        }
+        function activeArea() {
+          return areaById(S.activeAreaId) || S.doc.areas[0];
+        }
+        /** Switching area drops the paint target if it belongs elsewhere, so the
+         *  next stroke starts a fresh room in the area you just picked. */
+        function setActiveArea(id) {
+          S.activeAreaId = id;
+          const r = activeRoom();
+          if (r && r.areaId !== id) {
+            S.activeRoomId = null;
+            if (S.sel && S.sel.type === "room") S.sel = null;
+          }
+        }
+
+        /* ── Undo ──────────────────────────────────────────────────── */
+        function snapshot() {
+          return JSON.stringify(S.doc);
+        }
+        function pushUndo() {
+          undoStack.push(snapshot());
+          if (undoStack.length > 120) undoStack.shift();
+          redoStack.length = 0;
+        }
+        function restore(json) {
+          S.doc = migrate(JSON.parse(json));
+          if (S.sel && !selExists(S.sel)) S.sel = null;
+          if (!roomById(S.activeRoomId)) S.activeRoomId = null;
+          if (S.detailRoomId && !roomById(S.detailRoomId)) closeDetail();
+          if (S.detailRoomId) renderDetailInspector();
+          commit();
+        }
+        function selExists(sel) {
+          if (!sel) return false;
+          if (sel.type === "room") return !!roomById(sel.id);
+          if (sel.type === "lock") return !!lockById(sel.id);
+          if (sel.type === "key") return !!keyById(sel.id);
+          if (sel.type === "door") return S.doc.doors.some((d) => d.id === sel.id);
+          return false;
+        }
+        function undo() {
+          if (!undoStack.length) return;
+          redoStack.push(snapshot());
+          restore(undoStack.pop());
+        }
+        function redo() {
+          if (!redoStack.length) return;
+          undoStack.push(snapshot());
+          restore(redoStack.pop());
+        }
+
+        /** Call after every mutation: reindex, redraw, refresh panels, autosave.
+         *  Pass true for selection-only changes that don't touch the document. */
+        let uiDirty = false;
+        function commit(skipSave) {
+          reindex();
+          needsDraw = true;
+          // Rebuilding every panel on each cell of a paint drag is wasteful — defer to drag end.
+          if (S.drag || S.ddrag) uiDirty = true;
+          else renderUI();
+          if (!skipSave) scheduleSave();
+        }
+        function flushUI() {
+          if (!uiDirty) return;
+          uiDirty = false;
+          renderUI();
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           5 · Persistence — IndexedDB, falling back to localStorage
+           ══════════════════════════════════════════════════════════════ */
+        const Store = (function () {
+          const DB_NAME = "mvmap";
+          const STORE = "maps";
+          const LS_KEY = "mvmap:docs";
+          let db = null;
+          let mode = "idb";
+
+          function openDB() {
+            return new Promise((res) => {
+              let req;
+              try {
+                req = indexedDB.open(DB_NAME, 1);
+              } catch (e) {
+                mode = "ls";
+                return res();
+              }
+              req.onupgradeneeded = () => {
+                const d = req.result;
+                if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: "id" });
+              };
+              req.onsuccess = () => {
+                db = req.result;
+                mode = "idb";
+                res();
+              };
+              req.onerror = req.onblocked = () => {
+                mode = "ls";
+                res();
+              };
+              // Safari/file:// can hang without firing either handler.
+              setTimeout(() => {
+                if (!db && mode === "idb") {
+                  mode = "ls";
+                  res();
+                }
+              }, 1500);
+            });
+          }
+          const lsAll = () => {
+            try {
+              return JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+            } catch (e) {
+              return {};
+            }
+          };
+          const lsWrite = (o) => {
+            try {
+              localStorage.setItem(LS_KEY, JSON.stringify(o));
+            } catch (e) {}
+          };
+          function tx(fn, def) {
+            return new Promise((res) => {
+              if (mode !== "idb" || !db) return res(fn(null));
+              try {
+                res(fn(db.transaction(STORE, "readwrite").objectStore(STORE)));
+              } catch (e) {
+                mode = "ls";
+                res(def);
+              }
+            });
+          }
+          return {
+            get mode() {
+              return mode;
+            },
+            init: openDB,
+            put(doc) {
+              if (mode === "ls" || !db) {
+                const all = lsAll();
+                all[doc.id] = doc;
+                lsWrite(all);
+                return Promise.resolve();
+              }
+              return tx((st) => {
+                if (st) st.put(JSON.parse(JSON.stringify(doc)));
+              });
+            },
+            del(id) {
+              if (mode === "ls" || !db) {
+                const all = lsAll();
+                delete all[id];
+                lsWrite(all);
+                return Promise.resolve();
+              }
+              return tx((st) => {
+                if (st) st.delete(id);
+              });
+            },
+            all() {
+              if (mode === "ls" || !db) return Promise.resolve(Object.values(lsAll()));
+              return new Promise((res) => {
+                try {
+                  const r = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
+                  r.onsuccess = () => res(r.result || []);
+                  r.onerror = () => res([]);
+                } catch (e) {
+                  res(Object.values(lsAll()));
+                }
+              });
+            },
+          };
+        })();
+
+        let saveTimer = null;
+        function scheduleSave() {
+          setStatus("dirty");
+          clearTimeout(saveTimer);
+          saveTimer = setTimeout(async () => {
+            S.doc.updated = Date.now();
+            await Store.put(S.doc);
+            try {
+              localStorage.setItem("mvmap:last", S.doc.id);
+            } catch (e) {}
+            setStatus("saved");
+          }, 600);
+        }
+        function setStatus(kind) {
+          const el = $("#save-status");
+          if (kind === "dirty") {
+            el.textContent = "saving…";
+            el.classList.add("dirty");
+          } else {
+            el.textContent = "saved";
+            el.classList.remove("dirty");
+          }
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           6 · Geometry helpers
+           ══════════════════════════════════════════════════════════════ */
+        function roomBBox(room) {
+          if (!room || !room.cells.length) return null;
+          let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+          for (const c of room.cells) {
+            const [x, y] = unck(c);
+            if (x < x0) x0 = x;
+            if (y < y0) y0 = y;
+            if (x > x1) x1 = x;
+            if (y > y1) y1 = y;
+          }
+          return { x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+        }
+        function docBBox() {
+          let b = null;
+          const grow = (x, y) => {
+            if (!b) b = { x0: x, y0: y, x1: x, y1: y };
+            else {
+              b.x0 = Math.min(b.x0, x); b.y0 = Math.min(b.y0, y);
+              b.x1 = Math.max(b.x1, x); b.y1 = Math.max(b.y1, y);
+            }
+          };
+          for (const r of S.doc.rooms) for (const c of r.cells) { const [x, y] = unck(c); grow(x, y); }
+          for (const k of S.doc.keys) grow(k.x, k.y);
+          return b;
+        }
+        /** Midpoint of a door edge, in world pixels. */
+        function edgeMid(d) {
+          return d.o === "v"
+            ? { x: d.x * CELL, y: d.y * CELL + CELL / 2 }
+            : { x: d.x * CELL + CELL / 2, y: d.y * CELL };
+        }
+        function edgeCells(d) {
+          return d.o === "v" ? [[d.x - 1, d.y], [d.x, d.y]] : [[d.x, d.y - 1], [d.x, d.y]];
+        }
+        /** Nearest cell edge to a world point, or null if the point is mid-cell. */
+        function nearestEdge(wx, wy, tol) {
+          tol = tol == null ? 0.28 : tol;
+          const fx = wx / CELL, fy = wy / CELL;
+          const cx = Math.floor(fx), cy = Math.floor(fy);
+          const dx = fx - cx, dy = fy - cy;
+          const cands = [
+            { o: "v", x: cx, y: cy, d: dx },
+            { o: "v", x: cx + 1, y: cy, d: 1 - dx },
+            { o: "h", x: cx, y: cy, d: dy },
+            { o: "h", x: cx, y: cy + 1, d: 1 - dy },
+          ];
+          cands.sort((a, b) => a.d - b.d);
+          return cands[0].d <= tol ? { o: cands[0].o, x: cands[0].x, y: cands[0].y } : null;
+        }
+        /** Drop doors that no longer touch any room. */
+        function pruneDoors() {
+          S.doc.doors = S.doc.doors.filter((d) =>
+            edgeCells(d).some(([x, y]) => cellIndex.has(ck(x, y)))
+          );
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           7 · Mutations
+           ══════════════════════════════════════════════════════════════ */
+        function createRoom(areaId) {
+          const area = areaById(areaId || S.activeAreaId);
+          const n = S.doc.rooms.length + 1;
+          const r = { id: uid("room"), name: "Room " + n, areaId: area.id, color: null, notes: "", cells: [] };
+          S.doc.rooms.push(r);
+          S.activeRoomId = r.id;
+          return r;
+        }
+        function paintCell(x, y, room) {
+          const k = ck(x, y);
+          const ownerId = cellIndex.get(k);
+          if (ownerId === room.id) return false;
+          if (ownerId) {
+            const owner = roomById(ownerId);
+            owner.cells = owner.cells.filter((c) => c !== k);
+          }
+          room.cells.push(k);
+          cellIndex.set(k, room.id);
+          return true;
+        }
+        function eraseCell(x, y) {
+          const k = ck(x, y);
+          const ownerId = cellIndex.get(k);
+          if (!ownerId) return false;
+          const owner = roomById(ownerId);
+          owner.cells = owner.cells.filter((c) => c !== k);
+          cellIndex.delete(k);
+          return true;
+        }
+        /** Remove rooms left with no cells (plus their greybox data). */
+        function dropEmptyRooms() {
+          const gone = S.doc.rooms.filter((r) => !r.cells.length).map((r) => r.id);
+          if (!gone.length) return;
+          S.doc.rooms = S.doc.rooms.filter((r) => r.cells.length);
+          gone.forEach((id) => {
+            delete S.doc.detail[id];
+            if (S.activeRoomId === id) S.activeRoomId = null;
+            if (S.sel && S.sel.type === "room" && S.sel.id === id) S.sel = null;
+            if (S.detailRoomId === id) closeDetail();
+          });
+        }
+        function deleteRoom(id) {
+          const r = roomById(id);
+          if (!r) return;
+          const cells = new Set(r.cells);
+          S.doc.rooms = S.doc.rooms.filter((x) => x.id !== id);
+          delete S.doc.detail[id];
+          reindex();
+          pruneDoors();
+          S.doc.keys = S.doc.keys.filter((k) => !cells.has(ck(k.x, k.y)));
+          S.doc.locks.forEach((l) => (l.keyIds = l.keyIds.filter((kid) => keyById(kid))));
+          if (S.activeRoomId === id) S.activeRoomId = null;
+          if (S.sel && S.sel.id === id) S.sel = null;
+          if (S.detailRoomId === id) closeDetail();
+        }
+        function deleteDoor(id) {
+          S.doc.doors = S.doc.doors.filter((d) => d.id !== id);
+          if (S.sel && S.sel.id === id) S.sel = null;
+        }
+        function deleteKey(id) {
+          S.doc.keys = S.doc.keys.filter((k) => k.id !== id);
+          S.doc.locks.forEach((l) => (l.keyIds = l.keyIds.filter((k) => k !== id)));
+          if (S.sel && S.sel.id === id) S.sel = null;
+        }
+        function deleteLock(id) {
+          S.doc.locks = S.doc.locks.filter((l) => l.id !== id);
+          S.doc.doors.forEach((d) => {
+            if (d.lockId === id) { d.lockId = null; if (d.kind === "locked") d.kind = "door"; }
+          });
+          if (S.sel && S.sel.id === id) S.sel = null;
+        }
+        function createLock() {
+          const l = {
+            id: uid("lock"),
+            name: "Lock " + (S.doc.locks.length + 1),
+            color: LOCK_COLORS[S.doc.locks.length % LOCK_COLORS.length],
+            keyIds: [],
+          };
+          S.doc.locks.push(l);
+          return l;
+        }
+        function createKeyAt(x, y) {
+          const k = {
+            id: uid("key"),
+            name: "Key " + (S.doc.keys.length + 1),
+            color: LOCK_COLORS[S.doc.keys.length % LOCK_COLORS.length],
+            x, y,
+          };
+          S.doc.keys.push(k);
+          return k;
+        }
+        /** Move a room's cells, its keys, and the doors it solely owns. */
+        function translateRoom(room, dx, dy) {
+          if (!dx && !dy) return;
+          const owned = new Set(room.cells);
+          const movingDoors = S.doc.doors.filter((d) => {
+            const cs = edgeCells(d);
+            const inRoom = cs.filter(([x, y]) => owned.has(ck(x, y)));
+            if (!inRoom.length) return false;
+            // keep doors shared with a *different* room anchored in place
+            return cs.every(([x, y]) => {
+              const o = cellIndex.get(ck(x, y));
+              return !o || o === room.id;
+            });
+          });
+          const movingKeys = S.doc.keys.filter((k) => owned.has(ck(k.x, k.y)));
+
+          room.cells.forEach((c) => cellIndex.delete(c));
+          room.cells = room.cells.map((c) => {
+            const [x, y] = unck(c);
+            return ck(x + dx, y + dy);
+          });
+          // displace anything already sitting in the destination
+          for (const c of room.cells) {
+            const ownerId = cellIndex.get(c);
+            if (ownerId && ownerId !== room.id) {
+              const o = roomById(ownerId);
+              o.cells = o.cells.filter((z) => z !== c);
+            }
+          }
+          movingDoors.forEach((d) => { d.x += dx; d.y += dy; });
+          movingKeys.forEach((k) => { k.x += dx; k.y += dy; });
+          reindex();
+          // shift greybox geometry with the room
+          const det = S.doc.detail[room.id];
+          if (det) det.boxes.forEach((b) => { b.x += dx * det.sub; b.y += dy * det.sub; });
+          dropEmptyRooms();
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           8 · Camera / view
+           ══════════════════════════════════════════════════════════════ */
+        const worldCanvas = $("#world");
+        const wctx = worldCanvas.getContext("2d");
+        let VW = 0, VH = 0;
+
+        function makeView(cam, w, h) {
+          return {
+            cam, w, h,
+            sx: (wx) => (wx - cam.x) * cam.zoom + w / 2,
+            sy: (wy) => (wy - cam.y) * cam.zoom + h / 2,
+            wx: (sx) => (sx - w / 2) / cam.zoom + cam.x,
+            wy: (sy) => (sy - h / 2) / cam.zoom + cam.y,
+          };
+        }
+        function resizeCanvas(canvas, ctx) {
+          const dpr = window.devicePixelRatio || 1;
+          const r = canvas.getBoundingClientRect();
+          const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+          canvas.width = Math.round(w * dpr);
+          canvas.height = Math.round(h * dpr);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          return [w, h];
+        }
+        function zoomAt(cam, sxPt, syPt, factor, view) {
+          const bx = view.wx(sxPt), by = view.wy(syPt);
+          cam.zoom = clamp(cam.zoom * factor, 0.08, 8);
+          const v2 = makeView(cam, view.w, view.h);
+          cam.x += bx - v2.wx(sxPt);
+          cam.y += by - v2.wy(syPt);
+        }
+        function fitWorld() {
+          const b = docBBox();
+          if (!b) {
+            S.cam.x = 0; S.cam.y = 0; S.cam.zoom = 1;
+          } else {
+            const pw = (b.x1 - b.x0 + 1) * CELL, ph = (b.y1 - b.y0 + 1) * CELL;
+            S.cam.x = (b.x0 * CELL + pw / 2);
+            S.cam.y = (b.y0 * CELL + ph / 2);
+            S.cam.zoom = clamp(Math.min((VW - 80) / pw, (VH - 80) / ph), 0.08, 3);
+          }
+          needsDraw = true;
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           9 · World rendering
+           ══════════════════════════════════════════════════════════════ */
+        function drawGrid(ctx, V, cellPx) {
+          const z = V.cam.zoom, step = cellPx * z;
+          const left = V.wx(0), top = V.wy(0), right = V.wx(V.w), bottom = V.wy(V.h);
+          const x0 = Math.floor(left / cellPx), x1 = Math.ceil(right / cellPx);
+          const y0 = Math.floor(top / cellPx), y1 = Math.ceil(bottom / cellPx);
+
+          if (step >= 5) {
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "#1e2430";
+            ctx.beginPath();
+            for (let x = x0; x <= x1; x++) {
+              if (x % MAJOR === 0) continue;
+              const px = Math.round(V.sx(x * cellPx)) + 0.5;
+              ctx.moveTo(px, 0); ctx.lineTo(px, V.h);
+            }
+            for (let y = y0; y <= y1; y++) {
+              if (y % MAJOR === 0) continue;
+              const py = Math.round(V.sy(y * cellPx)) + 0.5;
+              ctx.moveTo(0, py); ctx.lineTo(V.w, py);
+            }
+            ctx.stroke();
+          }
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = "#2b3444";
+          ctx.beginPath();
+          for (let x = Math.ceil(x0 / MAJOR) * MAJOR; x <= x1; x += MAJOR) {
+            const px = Math.round(V.sx(x * cellPx)) + 0.5;
+            ctx.moveTo(px, 0); ctx.lineTo(px, V.h);
+          }
+          for (let y = Math.ceil(y0 / MAJOR) * MAJOR; y <= y1; y += MAJOR) {
+            const py = Math.round(V.sy(y * cellPx)) + 0.5;
+            ctx.moveTo(0, py); ctx.lineTo(V.w, py);
+          }
+          ctx.stroke();
+
+          // origin cross
+          ctx.strokeStyle = "#3a4658";
+          ctx.beginPath();
+          const ox = Math.round(V.sx(0)) + 0.5, oy = Math.round(V.sy(0)) + 0.5;
+          ctx.moveTo(ox, 0); ctx.lineTo(ox, V.h);
+          ctx.moveTo(0, oy); ctx.lineTo(V.w, oy);
+          ctx.stroke();
+        }
+
+        function drawRooms(ctx, V, opts) {
+          const z = V.cam.zoom;
+          const selRoomId = S.sel && S.sel.type === "room" ? S.sel.id : null;
+
+          for (const room of S.doc.rooms) {
+            const col = roomColor(room);
+            const cells = room.cells;
+            if (!cells.length) continue;
+            const set = new Set(cells);
+            const isSel = room.id === selRoomId;
+            const isActive = room.id === S.activeRoomId;
+
+            ctx.fillStyle = hexA(col, isSel ? 0.4 : 0.26);
+            for (const c of cells) {
+              const [x, y] = unck(c);
+              const px = V.sx(x * CELL), py = V.sy(y * CELL);
+              const s = CELL * z;
+              if (px > V.w || py > V.h || px + s < 0 || py + s < 0) continue;
+              ctx.fillRect(px, py, s + 0.5, s + 0.5);
+            }
+
+            // outline only the silhouette edges
+            ctx.strokeStyle = isSel ? shade(col, 0.3) : col;
+            ctx.lineWidth = isSel ? 2.5 : isActive ? 2 : 1.6;
+            ctx.lineCap = "square";
+            ctx.beginPath();
+            for (const c of cells) {
+              const [x, y] = unck(c);
+              const L = V.sx(x * CELL), T = V.sy(y * CELL);
+              const R = V.sx((x + 1) * CELL), B = V.sy((y + 1) * CELL);
+              if (R < 0 || B < 0 || L > V.w || T > V.h) continue;
+              if (!set.has(ck(x, y - 1))) { ctx.moveTo(L, T); ctx.lineTo(R, T); }
+              if (!set.has(ck(x, y + 1))) { ctx.moveTo(L, B); ctx.lineTo(R, B); }
+              if (!set.has(ck(x - 1, y))) { ctx.moveTo(L, T); ctx.lineTo(L, B); }
+              if (!set.has(ck(x + 1, y))) { ctx.moveTo(R, T); ctx.lineTo(R, B); }
+            }
+            ctx.stroke();
+          }
+
+          // labels
+          if (opts.labels && z * CELL > 16) {
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            for (const room of S.doc.rooms) {
+              const b = roomBBox(room);
+              if (!b) continue;
+              const cx = V.sx((b.x0 + b.w / 2) * CELL), cy = V.sy((b.y0 + b.h / 2) * CELL);
+              if (cx < -80 || cy < -20 || cx > V.w + 80 || cy > V.h + 20) continue;
+              const fs = clamp(Math.round(11 * Math.min(1.4, z)), 9, 15);
+              ctx.font = `600 ${fs}px ${FONTF}`;
+              const tw = ctx.measureText(room.name).width;
+              ctx.fillStyle = "rgba(10,12,16,0.62)";
+              ctx.fillRect(cx - tw / 2 - 4, cy - fs / 2 - 2, tw + 8, fs + 4);
+              ctx.fillStyle = "#e6ecf6";
+              ctx.fillText(room.name, cx, cy + 0.5);
+            }
+          }
+        }
+
+        function drawDoors(ctx, V) {
+          const z = V.cam.zoom;
+          const selId = S.sel && S.sel.type === "door" ? S.sel.id : null;
+          const selLock = S.sel && S.sel.type === "lock" ? S.sel.id : null;
+
+          for (const d of S.doc.doors) {
+            const m = edgeMid(d);
+            const cx = V.sx(m.x), cy = V.sy(m.y);
+            if (cx < -30 || cy < -30 || cx > V.w + 30 || cy > V.h + 30) continue;
+            const lock = d.lockId ? lockById(d.lockId) : null;
+            const along = CELL * z * 0.52; // length along the wall
+            const thick = clamp(CELL * z * 0.2, 3, 12); // thickness across the wall
+
+            let fill = "#93a0b4", stroke = "#0e1116";
+            if (d.kind === "passage") fill = "#5b6779";
+            if (lock) fill = lock.color;
+            if (d.kind === "oneway") fill = lock ? lock.color : "#f0a13a";
+
+            const w = d.o === "v" ? thick : along;
+            const h = d.o === "v" ? along : thick;
+            const highlight = d.id === selId || (selLock && d.lockId === selLock);
+
+            if (highlight) {
+              ctx.fillStyle = hexA(lock ? lock.color : "#5aa9f0", 0.3);
+              ctx.beginPath();
+              ctx.arc(cx, cy, Math.max(w, h) * 0.95, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            ctx.fillStyle = fill;
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 1;
+            roundRect(ctx, cx - w / 2, cy - h / 2, w, h, Math.min(3, thick / 2));
+            ctx.fill();
+            if (z > 0.4) ctx.stroke();
+
+            if (d.kind === "oneway" && z > 0.35) {
+              // arrow pointing in the traversable direction
+              ctx.fillStyle = "#15181f";
+              const s = Math.max(2.5, thick * 0.42);
+              ctx.beginPath();
+              if (d.o === "v") {
+                const dx = d.dir * s;
+                ctx.moveTo(cx + dx, cy);
+                ctx.lineTo(cx - dx * 0.5, cy - s);
+                ctx.lineTo(cx - dx * 0.5, cy + s);
+              } else {
+                const dy = d.dir * s;
+                ctx.moveTo(cx, cy + dy);
+                ctx.lineTo(cx - s, cy - dy * 0.5);
+                ctx.lineTo(cx + s, cy - dy * 0.5);
+              }
+              ctx.closePath();
+              ctx.fill();
+            } else if (lock && z > 0.5) {
+              ctx.fillStyle = "rgba(12,14,19,0.85)";
+              ctx.beginPath();
+              ctx.arc(cx, cy, Math.max(1.5, thick * 0.22), 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+
+        function drawKeys(ctx, V) {
+          const z = V.cam.zoom;
+          const selId = S.sel && S.sel.type === "key" ? S.sel.id : null;
+          const selLock = S.sel && S.sel.type === "lock" ? lockById(S.sel.id) : null;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+
+          for (const k of S.doc.keys) {
+            const cx = V.sx(k.x * CELL + CELL / 2), cy = V.sy(k.y * CELL + CELL / 2);
+            if (cx < -40 || cy < -40 || cx > V.w + 40 || cy > V.h + 40) continue;
+            const r = clamp(CELL * z * 0.26, 3, 22);
+            const on = k.id === selId || (selLock && selLock.keyIds.includes(k.id));
+
+            if (on) {
+              ctx.fillStyle = hexA(k.color, 0.28);
+              ctx.beginPath();
+              ctx.arc(cx, cy, r * 2, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fillStyle = k.color;
+            ctx.fill();
+            ctx.lineWidth = on ? 2 : 1.2;
+            ctx.strokeStyle = on ? "#ffffff" : "rgba(10,12,16,0.8)";
+            ctx.stroke();
+
+            if (z > 0.55) {
+              ctx.fillStyle = "rgba(10,12,16,0.85)";
+              ctx.font = `${Math.round(r * 1.25)}px ${FONTF}`;
+              ctx.fillText("✦", cx, cy + r * 0.06);
+            }
+            if (z > 0.75) {
+              const fs = clamp(Math.round(10 * Math.min(1.3, z)), 9, 13);
+              ctx.font = `500 ${fs}px ${FONTF}`;
+              const tw = ctx.measureText(k.name).width;
+              ctx.fillStyle = "rgba(10,12,16,0.66)";
+              ctx.fillRect(cx - tw / 2 - 3, cy + r + 2, tw + 6, fs + 3);
+              ctx.fillStyle = shade(k.color, 0.25);
+              ctx.fillText(k.name, cx, cy + r + 2 + fs / 2 + 2);
+            }
+          }
+        }
+
+        /** Curved dashed links from every key to the doors its lock guards. */
+        function drawFlow(ctx, V) {
+          const showAll = S.showFlow;
+          let locks = S.doc.locks;
+          if (!showAll) {
+            if (!S.sel) return;
+            if (S.sel.type === "lock") locks = [lockById(S.sel.id)].filter(Boolean);
+            else if (S.sel.type === "key") locks = S.doc.locks.filter((l) => l.keyIds.includes(S.sel.id));
+            else if (S.sel.type === "door") {
+              const d = S.doc.doors.find((x) => x.id === S.sel.id);
+              locks = d && d.lockId ? [lockById(d.lockId)].filter(Boolean) : [];
+            } else return;
+          }
+          if (!locks.length) return;
+
+          ctx.save();
+          ctx.lineWidth = clamp(1.6 * V.cam.zoom, 1.1, 3);
+          ctx.setLineDash([7, 5]);
+          for (const lock of locks) {
+            const doors = S.doc.doors.filter((d) => d.lockId === lock.id);
+            if (!doors.length) continue;
+            ctx.strokeStyle = hexA(lock.color, showAll ? 0.42 : 0.8);
+            ctx.fillStyle = hexA(lock.color, showAll ? 0.5 : 0.9);
+            for (const kid of lock.keyIds) {
+              const k = keyById(kid);
+              if (!k) continue;
+              const ax = V.sx(k.x * CELL + CELL / 2), ay = V.sy(k.y * CELL + CELL / 2);
+              for (const d of doors) {
+                const m = edgeMid(d);
+                const bx = V.sx(m.x), by = V.sy(m.y);
+                const mx = (ax + bx) / 2, my = (ay + by) / 2;
+                const nx = -(by - ay), ny = bx - ax;
+                const len = Math.hypot(nx, ny) || 1;
+                const bow = clamp(len * 0.14, 8, 70);
+                const qx = mx + (nx / len) * bow, qy = my + (ny / len) * bow;
+                ctx.beginPath();
+                ctx.moveTo(ax, ay);
+                ctx.quadraticCurveTo(qx, qy, bx, by);
+                ctx.stroke();
+                // arrowhead at the door end
+                const tx = bx - qx, ty = by - qy;
+                const a = Math.atan2(ty, tx);
+                const s = 6;
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.moveTo(bx, by);
+                ctx.lineTo(bx - s * Math.cos(a - 0.42), by - s * Math.sin(a - 0.42));
+                ctx.lineTo(bx - s * Math.cos(a + 0.42), by - s * Math.sin(a + 0.42));
+                ctx.closePath();
+                ctx.fill();
+                ctx.setLineDash([7, 5]);
+              }
+            }
+          }
+          ctx.restore();
+        }
+
+        function drawCursor(ctx, V) {
+          const z = V.cam.zoom, s = CELL * z;
+          // rectangle drag preview
+          if (S.drag && S.drag.type === "rect") {
+            const a = S.drag.a, b = S.drag.b;
+            const x0 = Math.min(a.x, b.x), y0 = Math.min(a.y, b.y);
+            const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
+            const px = V.sx(x0 * CELL), py = V.sy(y0 * CELL);
+            const room = activeRoom();
+            const col = S.drag.erase ? "#e0555f" : room ? roomColor(room) : activeArea().color;
+            ctx.fillStyle = hexA(col, 0.22);
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 1.5;
+            ctx.fillRect(px, py, (x1 - x0 + 1) * s, (y1 - y0 + 1) * s);
+            ctx.strokeRect(px + 0.5, py + 0.5, (x1 - x0 + 1) * s - 1, (y1 - y0 + 1) * s - 1);
+            return;
+          }
+          if (S.tool === "door" && S.hoverEdge) {
+            const e = S.hoverEdge;
+            const m = edgeMid({ o: e.o, x: e.x, y: e.y });
+            const cx = V.sx(m.x), cy = V.sy(m.y);
+            const along = s * 0.52, thick = clamp(s * 0.2, 3, 12);
+            ctx.fillStyle = "rgba(90,169,240,0.55)";
+            const w = e.o === "v" ? thick : along, h = e.o === "v" ? along : thick;
+            roundRect(ctx, cx - w / 2, cy - h / 2, w, h, 2);
+            ctx.fill();
+            return;
+          }
+          if (!S.hoverCell) return;
+          if (S.tool === "pan" || S.tool === "select") return;
+          const px = V.sx(S.hoverCell.x * CELL), py = V.sy(S.hoverCell.y * CELL);
+          const room = activeRoom();
+          const col = S.tool === "erase" ? "#e0555f" : S.tool === "key" ? "#f0dc3a" : room ? roomColor(room) : activeArea().color;
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 3]);
+          ctx.strokeRect(px + 1, py + 1, s - 2, s - 2);
+          ctx.setLineDash([]);
+        }
+
+        function roundRect(ctx, x, y, w, h, r) {
+          r = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.arcTo(x + w, y, x + w, y + h, r);
+          ctx.arcTo(x + w, y + h, x, y + h, r);
+          ctx.arcTo(x, y + h, x, y, r);
+          ctx.arcTo(x, y, x + w, y, r);
+          ctx.closePath();
+        }
+
+        function drawWorld(ctx, V, opts) {
+          opts = opts || {};
+          ctx.save();
+          ctx.fillStyle = opts.bg || "#12151b";
+          ctx.fillRect(0, 0, V.w, V.h);
+          if (opts.grid !== false) drawGrid(ctx, V, CELL);
+          drawRooms(ctx, V, { labels: opts.labels !== undefined ? opts.labels : S.showLabels });
+          drawFlow(ctx, V);
+          drawDoors(ctx, V);
+          drawKeys(ctx, V);
+          if (opts.cursor !== false) drawCursor(ctx, V);
+          ctx.restore();
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           10 · Render loop
+           ══════════════════════════════════════════════════════════════ */
+        function frame() {
+          if (needsDraw) {
+            needsDraw = false;
+            if (!S.detailRoomId) {
+              const [w, h] = resizeCanvas(worldCanvas, wctx);
+              VW = w; VH = h;
+              drawWorld(wctx, makeView(S.cam, w, h), {});
+              $("#hud-zoom").textContent = Math.round(S.cam.zoom * 100) + "%";
+            } else {
+              drawDetail();
+            }
+          }
+          requestAnimationFrame(frame);
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           11 · World input
+           ══════════════════════════════════════════════════════════════ */
+        function evPos(e) {
+          const r = worldCanvas.getBoundingClientRect();
+          return { x: e.clientX - r.left, y: e.clientY - r.top };
+        }
+        function cellAtEvent(V, p) {
+          return { x: Math.floor(V.wx(p.x) / CELL), y: Math.floor(V.wy(p.y) / CELL) };
+        }
+        function pickAt(V, p) {
+          const wx = V.wx(p.x), wy = V.wy(p.y);
+          const c = { x: Math.floor(wx / CELL), y: Math.floor(wy / CELL) };
+          // keys first — they sit on top
+          for (let i = S.doc.keys.length - 1; i >= 0; i--) {
+            const k = S.doc.keys[i];
+            const dx = wx - (k.x * CELL + CELL / 2), dy = wy - (k.y * CELL + CELL / 2);
+            if (Math.hypot(dx, dy) <= CELL * 0.3) return { type: "key", id: k.id };
+          }
+          const e = nearestEdge(wx, wy, 0.2);
+          if (e) {
+            const d = doorAtEdge(e.o, e.x, e.y);
+            if (d) return { type: "door", id: d.id };
+          }
+          const r = roomAtCell(c.x, c.y);
+          if (r) return { type: "room", id: r.id };
+          return null;
+        }
+
+        worldCanvas.addEventListener("pointerdown", (e) => {
+          if (e.button === 1 || S.spaceDown || S.tool === "pan") {
+            e.preventDefault();
+            worldCanvas.setPointerCapture(e.pointerId);
+            S.drag = { type: "pan", last: evPos(e) };
+            return;
+          }
+          if (e.button === 2) return;
+          worldCanvas.setPointerCapture(e.pointerId);
+          const V = makeView(S.cam, VW, VH);
+          const p = evPos(e);
+          const c = cellAtEvent(V, p);
+
+          if (S.tool === "select") {
+            const hit = pickAt(V, p);
+            S.sel = hit;
+            if (hit && hit.type === "room") {
+              S.activeRoomId = hit.id;
+              const room = roomById(hit.id);
+              S.activeAreaId = room.areaId;
+              S.drag = { type: "move", room, startCell: c, moved: false, dx: 0, dy: 0, undone: false };
+            } else if (hit && hit.type === "key") {
+              S.drag = { type: "movekey", key: keyById(hit.id), startCell: c, moved: false, undone: false };
+            }
+            commit(true);
+            return;
+          }
+
+          if (S.tool === "paint" || S.tool === "rect") {
+            let room = activeRoom();
+            if (e.shiftKey || !room) {
+              pushUndo();
+              room = createRoom();
+              S.sel = { type: "room", id: room.id };
+            } else pushUndo();
+            if (S.tool === "rect") {
+              S.drag = { type: "rect", a: c, b: c, room, erase: e.altKey };
+            } else {
+              S.drag = { type: "paint", room, erase: e.altKey, seen: new Set() };
+              applyPaint(c);
+            }
+            commit();
+            return;
+          }
+
+          if (S.tool === "erase") {
+            pushUndo();
+            S.drag = { type: "paint", room: null, erase: true, seen: new Set() };
+            applyPaint(c);
+            commit();
+            return;
+          }
+
+          if (S.tool === "door") {
+            const edge = nearestEdge(V.wx(p.x), V.wy(p.y), 0.5);
+            if (!edge) return;
+            const existing = doorAtEdge(edge.o, edge.x, edge.y);
+            pushUndo();
+            if (existing) {
+              if (e.altKey) deleteDoor(existing.id);
+              else S.sel = { type: "door", id: existing.id };
+            } else if (!e.altKey) {
+              const d = { id: uid("door"), x: edge.x, y: edge.y, o: edge.o, kind: "door", dir: 1, lockId: null };
+              S.doc.doors.push(d);
+              S.sel = { type: "door", id: d.id };
+            }
+            commit();
+            return;
+          }
+
+          if (S.tool === "key") {
+            pushUndo();
+            const k = createKeyAt(c.x, c.y);
+            S.sel = { type: "key", id: k.id };
+            commit();
+            return;
+          }
+        });
+
+        function applyPaint(c) {
+          const d = S.drag;
+          const k = ck(c.x, c.y);
+          if (d.seen.has(k)) return;
+          d.seen.add(k);
+          if (d.erase || !d.room) eraseCell(c.x, c.y);
+          else paintCell(c.x, c.y, d.room);
+        }
+
+        worldCanvas.addEventListener("pointermove", (e) => {
+          const V = makeView(S.cam, VW, VH);
+          const p = evPos(e);
+          const wx = V.wx(p.x), wy = V.wy(p.y);
+          const c = { x: Math.floor(wx / CELL), y: Math.floor(wy / CELL) };
+          $("#hud-coord").textContent = c.x + ", " + c.y;
+
+          const prev = S.hoverCell;
+          S.hoverCell = c;
+          S.hoverEdge = S.tool === "door" ? nearestEdge(wx, wy, 0.5) : null;
+          if (!prev || prev.x !== c.x || prev.y !== c.y || S.tool === "door") needsDraw = true;
+
+          const d = S.drag;
+          if (!d) return;
+
+          if (d.type === "pan") {
+            S.cam.x -= (p.x - d.last.x) / S.cam.zoom;
+            S.cam.y -= (p.y - d.last.y) / S.cam.zoom;
+            d.last = p;
+            needsDraw = true;
+          } else if (d.type === "paint") {
+            applyPaint(c);
+            commit();
+          } else if (d.type === "rect") {
+            d.b = c;
+            needsDraw = true;
+          } else if (d.type === "move") {
+            const dx = c.x - d.startCell.x, dy = c.y - d.startCell.y;
+            if (dx !== d.dx || dy !== d.dy) {
+              if (!d.undone) { pushUndo(); d.undone = true; }
+              translateRoom(d.room, dx - d.dx, dy - d.dy);
+              d.dx = dx; d.dy = dy;
+              d.moved = true;
+              commit();
+            }
+          } else if (d.type === "movekey") {
+            if (c.x !== d.key.x || c.y !== d.key.y) {
+              if (!d.undone) { pushUndo(); d.undone = true; }
+              d.key.x = c.x; d.key.y = c.y;
+              d.moved = true;
+              commit();
+            }
+          }
+        });
+
+        function endDrag() {
+          const d = S.drag;
+          if (!d) return;
+          if (d.type === "rect") {
+            const x0 = Math.min(d.a.x, d.b.x), y0 = Math.min(d.a.y, d.b.y);
+            const x1 = Math.max(d.a.x, d.b.x), y1 = Math.max(d.a.y, d.b.y);
+            for (let y = y0; y <= y1; y++)
+              for (let x = x0; x <= x1; x++) d.erase ? eraseCell(x, y) : paintCell(x, y, d.room);
+          }
+          if (d.type === "paint" || d.type === "rect" || d.type === "move") {
+            dropEmptyRooms();
+            reindex();
+            pruneDoors();
+          }
+          S.drag = null;
+          commit();
+          flushUI();
+        }
+        worldCanvas.addEventListener("pointerup", endDrag);
+        worldCanvas.addEventListener("pointercancel", endDrag);
+        worldCanvas.addEventListener("pointerleave", () => {
+          S.hoverCell = null;
+          S.hoverEdge = null;
+          needsDraw = true;
+        });
+        worldCanvas.addEventListener("dblclick", (e) => {
+          const V = makeView(S.cam, VW, VH);
+          const hit = pickAt(V, evPos(e));
+          if (hit && hit.type === "room") openDetail(hit.id);
+        });
+        worldCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
+        worldCanvas.addEventListener(
+          "wheel",
+          (e) => {
+            e.preventDefault();
+            const V = makeView(S.cam, VW, VH);
+            const p = evPos(e);
+            zoomAt(S.cam, p.x, p.y, Math.pow(0.999, e.deltaY), V);
+            needsDraw = true;
+          },
+          { passive: false }
+        );
+
+        /* ══════════════════════════════════════════════════════════════
+           12 · Keyboard
+           ══════════════════════════════════════════════════════════════ */
+        const TOOL_KEYS = { v: "select", b: "paint", r: "rect", e: "erase", d: "door", k: "key", h: "pan" };
+
+        window.addEventListener("keydown", (e) => {
+          const t = e.target;
+          const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+
+          if (e.code === "Space" && !typing) {
+            S.spaceDown = true;
+            e.preventDefault();
+            return;
+          }
+          if (typing) {
+            if (e.key === "Escape") t.blur();
+            return;
+          }
+
+          const mod = e.ctrlKey || e.metaKey;
+          if (mod && e.key.toLowerCase() === "z") {
+            e.preventDefault();
+            e.shiftKey ? redo() : undo();
+            return;
+          }
+          if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); return; }
+          if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); exportJSON(); return; }
+          if (mod) return;
+
+          if (!$("#modal").hidden) {
+            if (e.key === "Escape") closeModal();
+            return;
+          }
+
+          if (S.detailRoomId) {
+            detailKey(e);
+            return;
+          }
+
+          const tk = TOOL_KEYS[e.key.toLowerCase()];
+          if (tk) { setTool(tk); return; }
+          if (e.key === "f") { fitWorld(); return; }
+          if (e.key === "Escape") { S.sel = null; commit(true); return; }
+          if (e.key === "Enter" && S.sel && S.sel.type === "room") { openDetail(S.sel.id); return; }
+          if (e.key === "Delete" || e.key === "Backspace") {
+            if (!S.sel) return;
+            pushUndo();
+            if (S.sel.type === "room") deleteRoom(S.sel.id);
+            else if (S.sel.type === "door") deleteDoor(S.sel.id);
+            else if (S.sel.type === "key") deleteKey(S.sel.id);
+            else if (S.sel.type === "lock") deleteLock(S.sel.id);
+            commit();
+          }
+        });
+        window.addEventListener("keyup", (e) => {
+          if (e.code === "Space") S.spaceDown = false;
+        });
+        window.addEventListener("resize", () => { needsDraw = true; });
+
+        function setTool(t) {
+          S.tool = t;
+          document.querySelectorAll("#tools .tool").forEach((b) => b.classList.toggle("on", b.dataset.tool === t));
+          $("#hint").innerHTML = HINTS[t] || "";
+          worldCanvas.style.cursor = t === "pan" ? "grab" : t === "select" ? "default" : "crosshair";
+          needsDraw = true;
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           13 · Panels
+           ══════════════════════════════════════════════════════════════ */
+        function renderUI() {
+          renderAreas();
+          renderRooms();
+          renderLocks();
+          renderKeys();
+          renderInspector();
+          $("#btn-undo").disabled = !undoStack.length;
+          $("#btn-redo").disabled = !redoStack.length;
+          if ($("#map-name").value !== S.doc.name && document.activeElement !== $("#map-name"))
+            $("#map-name").value = S.doc.name;
+        }
+
+        function renderAreas() {
+          const host = $("#area-list");
+          const active = activeArea();
+          // Never blow away a name field that's mid-edit — just refresh the active highlight.
+          const focused = document.activeElement;
+          if (focused && focused.closest && focused.closest("#area-list [data-rename]")) {
+            host.querySelectorAll("[data-area]").forEach((row) =>
+              row.classList.toggle("on", row.dataset.area === active.id)
+            );
+            return;
+          }
+          host.innerHTML = S.doc.areas
+            .map(
+              (a) => `<div class="row ${a.id === active.id ? "on" : ""}" data-area="${a.id}">
+                 <button class="swatch" data-swatch="${a.id}" style="background:${a.color}" title="Change colour"></button>
+                 <input class="nm-edit" data-rename="${a.id}" value="${esc(a.name)}" spellcheck="false" />
+                 <span class="sub">${S.doc.rooms.filter((r) => r.areaId === a.id).length}</span>
+                 ${S.doc.areas.length > 1 ? `<button class="mini" data-delarea="${a.id}" title="Delete area">×</button>` : ""}
+               </div>`
+            )
+            .join("");
+        }
+
+        function renderRooms() {
+          const host = $("#room-list");
+          $("#room-count").textContent = S.doc.rooms.length;
+          if (!S.doc.rooms.length) {
+            host.innerHTML = `<div class="empty">Pick the Paint tool and drag on the grid.</div>`;
+            return;
+          }
+          const selId = S.sel && S.sel.type === "room" ? S.sel.id : null;
+          const byArea = new Map();
+          S.doc.rooms.forEach((r) => {
+            if (!byArea.has(r.areaId)) byArea.set(r.areaId, []);
+            byArea.get(r.areaId).push(r);
+          });
+          let html = "";
+          for (const a of S.doc.areas) {
+            const list = byArea.get(a.id);
+            if (!list || !list.length) continue;
+            html += `<div class="grp" style="color:${a.color}">${esc(a.name)}</div>`;
+            html += list
+              .map(
+                (r) => `<div class="row ${r.id === selId ? "on" : ""}" data-room="${r.id}">
+                   <span class="swatch" style="background:${roomColor(r)}"></span>
+                   <span class="nm">${esc(r.name)}</span>
+                   <span class="sub">${r.cells.length}</span>
+                 </div>`
+              )
+              .join("");
+          }
+          host.innerHTML = html;
+        }
+
+        function renderLocks() {
+          const host = $("#lock-list");
+          if (!S.doc.locks.length) {
+            host.innerHTML = `<div class="empty">No locks yet. Place a door, then give it a lock.</div>`;
+            return;
+          }
+          const selId = S.sel && S.sel.type === "lock" ? S.sel.id : null;
+          host.innerHTML = S.doc.locks
+            .map((l) => {
+              const doors = S.doc.doors.filter((d) => d.lockId === l.id).length;
+              const keys = l.keyIds.filter((k) => keyById(k)).length;
+              return `<div class="row ${l.id === selId ? "on" : ""}" data-lock="${l.id}">
+                  <span class="swatch" style="background:${l.color}"></span>
+                  <span class="nm">${esc(l.name)}</span>
+                  <span class="sub" title="${doors} door(s) · ${keys} key(s)">${doors}⌗ ${keys}✦</span>
+                </div>`;
+            })
+            .join("");
+        }
+
+        function renderKeys() {
+          const host = $("#key-list");
+          $("#key-count").textContent = S.doc.keys.length;
+          if (!S.doc.keys.length) {
+            host.innerHTML = `<div class="empty">No keys yet. Use the Key tool on a cell.</div>`;
+            return;
+          }
+          const selId = S.sel && S.sel.type === "key" ? S.sel.id : null;
+          host.innerHTML = S.doc.keys
+            .map((k) => {
+              const r = roomAtCell(k.x, k.y);
+              return `<div class="row ${k.id === selId ? "on" : ""}" data-key="${k.id}">
+                  <span class="swatch rnd" style="background:${k.color}"></span>
+                  <span class="nm">${esc(k.name)}</span>
+                  <span class="sub">${r ? esc(r.name) : k.x + "," + k.y}</span>
+                </div>`;
+            })
+            .join("");
+        }
+
+        /* ── Inspector ─────────────────────────────────────────────── */
+        function renderInspector() {
+          const host = $("#inspector");
+          if (!S.sel || !selExists(S.sel)) {
+            const r = activeRoom();
+            host.innerHTML = `<div class="meta">Nothing selected.${
+              r ? ` Painting into <b style="color:${roomColor(r)}">${esc(r.name)}</b>.` : ""
+            }<br /><br />Select a room to rename, recolour, or grey-box it. Select a door to lock it. Select a lock to see which keys open it.</div>`;
+            return;
+          }
+          if (S.sel.type === "room") return inspectRoom(host, roomById(S.sel.id));
+          if (S.sel.type === "door") return inspectDoor(host, S.doc.doors.find((d) => d.id === S.sel.id));
+          if (S.sel.type === "key") return inspectKey(host, keyById(S.sel.id));
+          if (S.sel.type === "lock") return inspectLock(host, lockById(S.sel.id));
+        }
+
+        const colorChips = (colors, current, attr) =>
+          `<div class="chips">${colors
+            .map((c) => `<button class="chip ${c === current ? "on" : ""}" style="background:${c}" data-${attr}="${c}"></button>`)
+            .join("")}</div>`;
+
+        function inspectRoom(host, r) {
+          const b = roomBBox(r);
+          const det = S.doc.detail[r.id];
+          host.innerHTML = `
+            <div class="insp-title"><span class="swatch" style="background:${roomColor(r)}"></span>
+              <span class="kind">Room</span></div>
+            <div class="fld"><label>Name</label><input type="text" id="i-name" value="${esc(r.name)}" /></div>
+            <div class="fld"><label>Area</label><select id="i-area">${S.doc.areas
+              .map((a) => `<option value="${a.id}" ${a.id === r.areaId ? "selected" : ""}>${esc(a.name)}</option>`)
+              .join("")}</select></div>
+            <div class="fld"><label>Colour override</label>
+              ${colorChips(AREA_COLORS, r.color, "color")}
+              <button class="btn" id="i-clear-color" style="margin-top:4px">Use area colour</button>
+            </div>
+            <div class="fld"><label>Notes</label><textarea id="i-notes" placeholder="Design notes, enemies, secrets…">${esc(r.notes)}</textarea></div>
+            <div class="meta">${r.cells.length} cells · ${b ? b.w + "×" + b.h : "—"} at ${b ? b.x0 + "," + b.y0 : "—"}${
+            det && det.boxes.length ? ` · ${det.boxes.length} greybox shapes` : ""
+          }</div>
+            <div class="btn-row">
+              <button class="btn primary" id="i-detail">Grey-box…</button>
+              <button class="btn danger" id="i-del">Delete</button>
+            </div>`;
+
+          $("#i-name").oninput = (e) => { r.name = e.target.value; needsDraw = true; renderRooms(); scheduleSave(); };
+          undoOnFocus($("#i-name"), $("#i-notes"));
+          $("#i-area").onchange = (e) => { pushUndo(); r.areaId = e.target.value; S.activeAreaId = r.areaId; commit(); };
+          $("#i-notes").oninput = (e) => { r.notes = e.target.value; scheduleSave(); };
+          $("#i-clear-color").onclick = () => { pushUndo(); r.color = null; commit(); };
+          $("#i-detail").onclick = () => openDetail(r.id);
+          $("#i-del").onclick = () => { pushUndo(); deleteRoom(r.id); commit(); };
+          host.querySelectorAll("[data-color]").forEach((b2) => {
+            b2.onclick = () => { pushUndo(); r.color = b2.dataset.color; commit(); };
+          });
+        }
+
+        function inspectDoor(host, d) {
+          if (!d) return;
+          const lock = d.lockId ? lockById(d.lockId) : null;
+          const cells = edgeCells(d).map(([x, y]) => roomAtCell(x, y));
+          host.innerHTML = `
+            <div class="insp-title"><span class="swatch" style="background:${lock ? lock.color : "#93a0b4"}"></span>
+              <span class="kind">Door</span></div>
+            <div class="fld"><label>Type</label>
+              <div class="seg" id="i-kind">
+                <button data-kind="passage" class="${d.kind === "passage" ? "on" : ""}">Passage</button>
+                <button data-kind="door" class="${d.kind === "door" ? "on" : ""}">Door</button>
+                <button data-kind="oneway" class="${d.kind === "oneway" ? "on" : ""}">One-way</button>
+              </div>
+            </div>
+            ${
+              d.kind === "oneway"
+                ? `<div class="fld"><label>Direction</label><button class="btn" id="i-flip">Passable ${
+                    d.o === "v" ? (d.dir === 1 ? "→ east" : "← west") : d.dir === 1 ? "↓ south" : "↑ north"
+                  } — flip</button></div>`
+                : ""
+            }
+            <div class="fld"><label>Lock</label>
+              <select id="i-lock">
+                <option value="">— unlocked —</option>
+                ${S.doc.locks.map((l) => `<option value="${l.id}" ${l.id === d.lockId ? "selected" : ""}>${esc(l.name)}</option>`).join("")}
+                <option value="__new">+ New lock…</option>
+              </select>
+            </div>
+            ${
+              lock
+                ? `<div class="fld"><label>Opened by</label>${keyToggleList(lock)}</div>
+                   <button class="btn" id="i-sel-lock">Select lock “${esc(lock.name)}”</button>`
+                : ""
+            }
+            <div class="meta">Between ${cells.map((c) => (c ? esc(c.name) : "void")).join(" ↔ ")}</div>
+            <div class="btn-row"><button class="btn danger" id="i-del">Delete door</button></div>`;
+
+          host.querySelectorAll("#i-kind button").forEach((b) => {
+            b.onclick = () => { pushUndo(); d.kind = b.dataset.kind; commit(); };
+          });
+          const flip = $("#i-flip");
+          if (flip) flip.onclick = () => { pushUndo(); d.dir = -d.dir; commit(); };
+          $("#i-lock").onchange = (e) => {
+            pushUndo();
+            if (e.target.value === "__new") { const l = createLock(); d.lockId = l.id; }
+            else d.lockId = e.target.value || null;
+            commit();
+          };
+          const sl = $("#i-sel-lock");
+          if (sl) sl.onclick = () => { S.sel = { type: "lock", id: lock.id }; commit(true); };
+          bindKeyToggles(host, lock);
+          $("#i-del").onclick = () => { pushUndo(); deleteDoor(d.id); commit(); };
+        }
+
+        function keyToggleList(lock) {
+          if (!S.doc.keys.length) return `<div class="meta">No keys exist yet — place one with the Key tool.</div>`;
+          return `<div class="link-list">${S.doc.keys
+            .map(
+              (k) => `<label class="check"><input type="checkbox" data-keytoggle="${k.id}" ${
+                lock.keyIds.includes(k.id) ? "checked" : ""
+              } /><span class="swatch rnd" style="background:${k.color}"></span><span>${esc(k.name)}</span></label>`
+            )
+            .join("")}</div>`;
+        }
+        function bindKeyToggles(host, lock) {
+          if (!lock) return;
+          host.querySelectorAll("[data-keytoggle]").forEach((cb) => {
+            cb.onchange = () => {
+              pushUndo();
+              const id = cb.dataset.keytoggle;
+              if (cb.checked) { if (!lock.keyIds.includes(id)) lock.keyIds.push(id); }
+              else lock.keyIds = lock.keyIds.filter((x) => x !== id);
+              commit();
+            };
+          });
+        }
+
+        function inspectKey(host, k) {
+          if (!k) return;
+          const room = roomAtCell(k.x, k.y);
+          const opens = S.doc.locks.filter((l) => l.keyIds.includes(k.id));
+          host.innerHTML = `
+            <div class="insp-title"><span class="swatch rnd" style="background:${k.color}"></span>
+              <span class="kind">Key</span></div>
+            <div class="fld"><label>Name</label><input type="text" id="i-name" value="${esc(k.name)}" placeholder="Double Jump, Red Key…" /></div>
+            <div class="fld"><label>Colour</label>${colorChips(LOCK_COLORS, k.color, "kcolor")}</div>
+            <div class="fld"><label>Opens</label>
+              ${
+                S.doc.locks.length
+                  ? `<div class="link-list">${S.doc.locks
+                      .map(
+                        (l) => `<label class="check"><input type="checkbox" data-locktoggle="${l.id}" ${
+                          l.keyIds.includes(k.id) ? "checked" : ""
+                        } /><span class="swatch" style="background:${l.color}"></span><span>${esc(l.name)}</span></label>`
+                      )
+                      .join("")}</div>`
+                  : `<div class="meta">No locks yet.</div>`
+              }
+            </div>
+            <div class="meta">Cell ${k.x}, ${k.y}${room ? " · in " + esc(room.name) : ""} · opens ${opens.length} lock(s)</div>
+            <div class="btn-row"><button class="btn danger" id="i-del">Delete key</button></div>`;
+
+          $("#i-name").oninput = (e) => { k.name = e.target.value; needsDraw = true; renderKeys(); scheduleSave(); };
+          undoOnFocus($("#i-name"));
+          host.querySelectorAll("[data-kcolor]").forEach((b) => {
+            b.onclick = () => { pushUndo(); k.color = b.dataset.kcolor; commit(); };
+          });
+          host.querySelectorAll("[data-locktoggle]").forEach((cb) => {
+            cb.onchange = () => {
+              pushUndo();
+              const l = lockById(cb.dataset.locktoggle);
+              if (cb.checked) { if (!l.keyIds.includes(k.id)) l.keyIds.push(k.id); }
+              else l.keyIds = l.keyIds.filter((x) => x !== k.id);
+              commit();
+            };
+          });
+          $("#i-del").onclick = () => { pushUndo(); deleteKey(k.id); commit(); };
+        }
+
+        function inspectLock(host, l) {
+          if (!l) return;
+          const doors = S.doc.doors.filter((d) => d.lockId === l.id);
+          const keys = l.keyIds.map(keyById).filter(Boolean);
+          host.innerHTML = `
+            <div class="insp-title"><span class="swatch" style="background:${l.color}"></span>
+              <span class="kind">Lock</span></div>
+            <div class="fld"><label>Name</label><input type="text" id="i-name" value="${esc(l.name)}" placeholder="Grapple gate…" /></div>
+            <div class="fld"><label>Colour</label>${colorChips(LOCK_COLORS, l.color, "lcolor")}</div>
+            <div class="fld"><label>Opened by any of</label>${keyToggleList(l)}</div>
+            <div class="meta">${doors.length} door(s) use this lock · ${keys.length} key(s) open it${
+            doors.length && !keys.length ? ` · <span style="color:#e0a13a">soft-locked: no key assigned</span>` : ""
+          }</div>
+            <div class="btn-row"><button class="btn danger" id="i-del">Delete lock</button></div>`;
+
+          $("#i-name").oninput = (e) => { l.name = e.target.value; renderLocks(); scheduleSave(); };
+          undoOnFocus($("#i-name"));
+          host.querySelectorAll("[data-lcolor]").forEach((b) => {
+            b.onclick = () => { pushUndo(); l.color = b.dataset.lcolor; commit(); };
+          });
+          bindKeyToggles(host, l);
+          $("#i-del").onclick = () => { pushUndo(); deleteLock(l.id); commit(); };
+        }
+
+        /** Text fields mutate on every keystroke — take one undo snapshot per editing session. */
+        function undoOnFocus() {
+          for (const el of arguments) if (el) el.addEventListener("focus", () => pushUndo());
+        }
+
+        /* ── Panel event delegation ────────────────────────────────── */
+        $("#tools").addEventListener("click", (e) => {
+          const b = e.target.closest("[data-tool]");
+          if (b) setTool(b.dataset.tool);
+        });
+
+        $("#area-list").addEventListener("click", (e) => {
+          const sw = e.target.closest("[data-swatch]");
+          if (sw) {
+            const a = areaById(sw.dataset.swatch);
+            pushUndo();
+            a.color = AREA_COLORS[(AREA_COLORS.indexOf(a.color) + 1) % AREA_COLORS.length];
+            commit();
+            return;
+          }
+          const del = e.target.closest("[data-delarea]");
+          if (del) {
+            const id = del.dataset.delarea;
+            if (S.doc.areas.length < 2) return;
+            pushUndo();
+            S.doc.areas = S.doc.areas.filter((a) => a.id !== id);
+            const fallback = S.doc.areas[0].id;
+            S.doc.rooms.forEach((r) => { if (r.areaId === id) r.areaId = fallback; });
+            if (S.activeAreaId === id) S.activeAreaId = fallback;
+            commit();
+            return;
+          }
+          const row = e.target.closest("[data-area]");
+          if (row) { setActiveArea(row.dataset.area); commit(true); }
+        });
+        $("#area-list").addEventListener("input", (e) => {
+          const inp = e.target.closest("[data-rename]");
+          if (!inp) return;
+          areaById(inp.dataset.rename).name = inp.value;
+          needsDraw = true;
+          renderRooms();
+          scheduleSave();
+        });
+
+        $("#room-list").addEventListener("click", (e) => {
+          const row = e.target.closest("[data-room]");
+          if (!row) return;
+          const r = roomById(row.dataset.room);
+          S.sel = { type: "room", id: r.id };
+          S.activeRoomId = r.id;
+          S.activeAreaId = r.areaId;
+          commit(true);
+        });
+        $("#room-list").addEventListener("dblclick", (e) => {
+          const row = e.target.closest("[data-room]");
+          if (row) openDetail(row.dataset.room);
+        });
+        $("#lock-list").addEventListener("click", (e) => {
+          const row = e.target.closest("[data-lock]");
+          if (row) { S.sel = { type: "lock", id: row.dataset.lock }; commit(true); }
+        });
+        $("#key-list").addEventListener("click", (e) => {
+          const row = e.target.closest("[data-key]");
+          if (!row) return;
+          S.sel = { type: "key", id: row.dataset.key };
+          const k = keyById(row.dataset.key);
+          if (k) { S.cam.x = k.x * CELL + CELL / 2; S.cam.y = k.y * CELL + CELL / 2; }
+          commit(true);
+        });
+
+        $("#btn-add-area").onclick = () => {
+          pushUndo();
+          const a = {
+            id: uid("area"),
+            name: "Area " + (S.doc.areas.length + 1),
+            color: AREA_COLORS[S.doc.areas.length % AREA_COLORS.length],
+          };
+          S.doc.areas.push(a);
+          S.activeAreaId = a.id;
+          S.activeRoomId = null;
+          S.sel = null;
+          // Open a room in the new area straight away so you can just start drawing.
+          const r = createRoom(a.id);
+          S.sel = { type: "room", id: r.id };
+          setTool("paint");
+          commit();
+        };
+        $("#btn-add-lock").onclick = () => {
+          pushUndo();
+          const l = createLock();
+          S.sel = { type: "lock", id: l.id };
+          commit();
+        };
+        $("#chk-flow").onchange = (e) => { S.showFlow = e.target.checked; needsDraw = true; };
+        $("#chk-labels").onchange = (e) => { S.showLabels = e.target.checked; needsDraw = true; };
+        $("#btn-fit").onclick = fitWorld;
+        $("#btn-undo").onclick = undo;
+        $("#btn-redo").onclick = redo;
+        $("#map-name").oninput = (e) => { S.doc.name = e.target.value; scheduleSave(); };
+        $("#map-name").addEventListener("focus", () => pushUndo());
+        $("#area-list").addEventListener("focusin", (e) => {
+          if (e.target.matches("[data-rename]")) pushUndo();
+        });
+
+        /* ══════════════════════════════════════════════════════════════
+           14 · Grey-box (room detail) editor
+           ══════════════════════════════════════════════════════════════ */
+        const dCanvas = $("#detail-canvas");
+        const dctx = dCanvas.getContext("2d");
+        let DW = 0, DH = 0;
+
+        function detailData(roomId) {
+          if (!S.doc.detail[roomId]) S.doc.detail[roomId] = { sub: 8, boxes: [] };
+          const d = S.doc.detail[roomId];
+          if (!Array.isArray(d.boxes)) d.boxes = [];
+          if (!d.sub) d.sub = 8;
+          return d;
+        }
+        function openDetail(roomId) {
+          const room = roomById(roomId);
+          if (!room || !room.cells.length) return;
+          S.detailRoomId = roomId;
+          S.dsel = null;
+          const det = detailData(roomId);
+          $("#detail-sub").value = String(det.sub);
+          $("#detail-title").textContent = room.name;
+          $("#detail").hidden = false;
+          setDTool(S.dtool);
+          renderTypePalette();
+          fitDetail();
+          needsDraw = true;
+        }
+        function closeDetail() {
+          S.detailRoomId = null;
+          S.dsel = null;
+          $("#detail").hidden = true;
+          $("#detail-inspector").hidden = true;
+          needsDraw = true;
+        }
+        function fitDetail() {
+          const room = roomById(S.detailRoomId);
+          const det = detailData(S.detailRoomId);
+          const b = roomBBox(room);
+          if (!b) return;
+          const r = dCanvas.getBoundingClientRect();
+          DW = Math.max(1, Math.round(r.width));
+          DH = Math.max(1, Math.round(r.height));
+          const pw = b.w * det.sub * DCELL, ph = b.h * det.sub * DCELL;
+          S.dcam.x = (b.x0 * det.sub + (b.w * det.sub) / 2) * DCELL;
+          S.dcam.y = (b.y0 * det.sub + (b.h * det.sub) / 2) * DCELL;
+          S.dcam.zoom = clamp(Math.min((DW - 70) / pw, (DH - 70) / ph), 0.05, 4);
+          needsDraw = true;
+        }
+        function setDTool(t) {
+          S.dtool = t;
+          document.querySelectorAll("#detail-tools .tool").forEach((b) => b.classList.toggle("on", b.dataset.dtool === t));
+          dCanvas.style.cursor = t === "pan" ? "grab" : t === "select" ? "default" : "crosshair";
+          needsDraw = true;
+        }
+        function renderTypePalette() {
+          $("#detail-types").innerHTML = BOX_TYPES.map(
+            (t) => `<button class="ty ${t.id === S.dtype ? "on" : ""}" data-dtype="${t.id}">
+                <span class="swatch" style="background:${t.color}"></span>${t.name}</button>`
+          ).join("");
+        }
+        $("#detail-types").addEventListener("click", (e) => {
+          const b = e.target.closest("[data-dtype]");
+          if (!b) return;
+          S.dtype = b.dataset.dtype;
+          if (S.dsel) {
+            const box = detailData(S.detailRoomId).boxes.find((x) => x.id === S.dsel);
+            if (box) { pushUndo(); box.type = S.dtype; commit(); }
+          }
+          renderTypePalette();
+          renderDetailInspector();
+          needsDraw = true;
+        });
+        $("#detail-tools").addEventListener("click", (e) => {
+          const b = e.target.closest("[data-dtool]");
+          if (b) setDTool(b.dataset.dtool);
+        });
+        $("#detail-close").onclick = closeDetail;
+        $("#detail-fit").onclick = fitDetail;
+        $("#detail-sub").onchange = (e) => {
+          const det = detailData(S.detailRoomId);
+          const next = +e.target.value;
+          if (next === det.sub) return;
+          pushUndo();
+          const f = next / det.sub;
+          det.boxes.forEach((b) => {
+            b.x = Math.round(b.x * f); b.y = Math.round(b.y * f);
+            b.w = Math.max(1, Math.round(b.w * f)); b.h = Math.max(1, Math.round(b.h * f));
+          });
+          det.sub = next;
+          commit();
+          fitDetail();
+        };
+
+        function drawDetail() {
+          const room = roomById(S.detailRoomId);
+          if (!room) return;
+          const det = detailData(S.detailRoomId);
+          const [w, h] = resizeCanvas(dCanvas, dctx);
+          DW = w; DH = h;
+          const V = makeView(S.dcam, w, h);
+          const sub = det.sub, U = DCELL; // one sub-cell = DCELL px at zoom 1
+          const z = S.dcam.zoom;
+
+          dctx.fillStyle = "#0e1116";
+          dctx.fillRect(0, 0, w, h);
+
+          // in-room floor
+          dctx.fillStyle = "#181d26";
+          for (const c of room.cells) {
+            const [cx, cy] = unck(c);
+            dctx.fillRect(V.sx(cx * sub * U), V.sy(cy * sub * U), sub * U * z + 0.5, sub * U * z + 0.5);
+          }
+
+          // sub-grid
+          const step = U * z;
+          const x0 = Math.floor(V.wx(0) / U), x1 = Math.ceil(V.wx(w) / U);
+          const y0 = Math.floor(V.wy(0) / U), y1 = Math.ceil(V.wy(h) / U);
+          if (step >= 4) {
+            dctx.strokeStyle = "#1e2430";
+            dctx.lineWidth = 1;
+            dctx.beginPath();
+            for (let x = x0; x <= x1; x++) {
+              if (x % sub === 0) continue;
+              const px = Math.round(V.sx(x * U)) + 0.5;
+              dctx.moveTo(px, 0); dctx.lineTo(px, h);
+            }
+            for (let y = y0; y <= y1; y++) {
+              if (y % sub === 0) continue;
+              const py = Math.round(V.sy(y * U)) + 0.5;
+              dctx.moveTo(0, py); dctx.lineTo(w, py);
+            }
+            dctx.stroke();
+          }
+          // world-cell grid
+          dctx.strokeStyle = "#333e50";
+          dctx.beginPath();
+          for (let x = Math.ceil(x0 / sub) * sub; x <= x1; x += sub) {
+            const px = Math.round(V.sx(x * U)) + 0.5;
+            dctx.moveTo(px, 0); dctx.lineTo(px, h);
+          }
+          for (let y = Math.ceil(y0 / sub) * sub; y <= y1; y += sub) {
+            const py = Math.round(V.sy(y * U)) + 0.5;
+            dctx.moveTo(0, py); dctx.lineTo(w, py);
+          }
+          dctx.stroke();
+
+          // room silhouette
+          const set = new Set(room.cells);
+          dctx.strokeStyle = roomColor(room);
+          dctx.lineWidth = 2;
+          dctx.beginPath();
+          for (const c of room.cells) {
+            const [cx, cy] = unck(c);
+            const L = V.sx(cx * sub * U), T = V.sy(cy * sub * U);
+            const R = V.sx((cx + 1) * sub * U), B = V.sy((cy + 1) * sub * U);
+            if (!set.has(ck(cx, cy - 1))) { dctx.moveTo(L, T); dctx.lineTo(R, T); }
+            if (!set.has(ck(cx, cy + 1))) { dctx.moveTo(L, B); dctx.lineTo(R, B); }
+            if (!set.has(ck(cx - 1, cy))) { dctx.moveTo(L, T); dctx.lineTo(L, B); }
+            if (!set.has(ck(cx + 1, cy))) { dctx.moveTo(R, T); dctx.lineTo(R, B); }
+          }
+          dctx.stroke();
+
+          // doors on the room border, as anchors while greyboxing
+          for (const d of S.doc.doors) {
+            const cs = edgeCells(d);
+            if (!cs.some(([x, y]) => set.has(ck(x, y)))) continue;
+            const lock = d.lockId ? lockById(d.lockId) : null;
+            const along = sub * U * z * 0.5, thick = clamp(sub * U * z * 0.12, 3, 14);
+            const cx = V.sx(d.o === "v" ? d.x * sub * U : (d.x * sub + sub / 2) * U);
+            const cy = V.sy(d.o === "v" ? (d.y * sub + sub / 2) * U : d.y * sub * U);
+            dctx.fillStyle = lock ? lock.color : "#93a0b4";
+            const bw = d.o === "v" ? thick : along, bh = d.o === "v" ? along : thick;
+            roundRect(dctx, cx - bw / 2, cy - bh / 2, bw, bh, 2);
+            dctx.fill();
+          }
+
+          // boxes
+          dctx.textAlign = "center";
+          dctx.textBaseline = "middle";
+          for (const b of det.boxes) {
+            const t = boxType(b.type);
+            const px = V.sx(b.x * U), py = V.sy(b.y * U);
+            const pw = b.w * U * z, ph = b.h * U * z;
+            if (px > w || py > h || px + pw < 0 || py + ph < 0) continue;
+            dctx.fillStyle = hexA(t.color, 0.32);
+            dctx.fillRect(px, py, pw, ph);
+            dctx.strokeStyle = t.color;
+            dctx.lineWidth = b.id === S.dsel ? 2.5 : 1.4;
+            dctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+            if (b.label && pw > 26 && ph > 12) {
+              const fs = clamp(Math.round(11 * Math.min(1.4, z * 1.4)), 9, 15);
+              dctx.font = `500 ${fs}px ${FONTF}`;
+              dctx.fillStyle = shade(t.color, 0.35);
+              dctx.fillText(b.label, px + pw / 2, py + ph / 2);
+            }
+            if (b.id === S.dsel) {
+              dctx.fillStyle = "#ffffff";
+              dctx.fillRect(px + pw - 5, py + ph - 5, 9, 9);
+              dctx.strokeStyle = "#0e1116";
+              dctx.lineWidth = 1;
+              dctx.strokeRect(px + pw - 5.5, py + ph - 5.5, 10, 10);
+            }
+          }
+
+          // drag preview
+          if (S.ddrag && S.ddrag.type === "box") {
+            const r = normRect(S.ddrag.a, S.ddrag.b);
+            const t = boxType(S.dtype);
+            dctx.fillStyle = hexA(t.color, 0.22);
+            dctx.strokeStyle = t.color;
+            dctx.lineWidth = 1.5;
+            dctx.fillRect(V.sx(r.x * U), V.sy(r.y * U), r.w * U * z, r.h * U * z);
+            dctx.strokeRect(V.sx(r.x * U) + 0.5, V.sy(r.y * U) + 0.5, r.w * U * z - 1, r.h * U * z - 1);
+          }
+        }
+
+        function normRect(a, b) {
+          const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+          return { x, y, w: Math.abs(b.x - a.x) + 1, h: Math.abs(b.y - a.y) + 1 };
+        }
+        function dEvPos(e) {
+          const r = dCanvas.getBoundingClientRect();
+          return { x: e.clientX - r.left, y: e.clientY - r.top };
+        }
+        function dSubAt(V, p) {
+          return { x: Math.floor(V.wx(p.x) / DCELL), y: Math.floor(V.wy(p.y) / DCELL) };
+        }
+        function boxAt(det, sx, sy) {
+          for (let i = det.boxes.length - 1; i >= 0; i--) {
+            const b = det.boxes[i];
+            if (sx >= b.x && sx < b.x + b.w && sy >= b.y && sy < b.y + b.h) return b;
+          }
+          return null;
+        }
+
+        dCanvas.addEventListener("pointerdown", (e) => {
+          const V = makeView(S.dcam, DW, DH);
+          const p = dEvPos(e);
+          const s = dSubAt(V, p);
+          const det = detailData(S.detailRoomId);
+
+          if (e.button === 1 || S.spaceDown || S.dtool === "pan") {
+            dCanvas.setPointerCapture(e.pointerId);
+            S.ddrag = { type: "pan", last: p };
+            return;
+          }
+          if (e.button === 2) return;
+          dCanvas.setPointerCapture(e.pointerId);
+
+          if (S.dtool === "box") {
+            S.ddrag = { type: "box", a: s, b: s };
+            needsDraw = true;
+            return;
+          }
+          if (S.dtool === "erase") {
+            const b = boxAt(det, s.x, s.y);
+            if (b) {
+              pushUndo();
+              det.boxes = det.boxes.filter((x) => x !== b);
+              if (S.dsel === b.id) S.dsel = null;
+              commit();
+              renderDetailInspector();
+            }
+            S.ddrag = { type: "erase" };
+            return;
+          }
+          if (S.dtool === "select") {
+            const sel = det.boxes.find((x) => x.id === S.dsel);
+            if (sel) {
+              // bottom-right resize handle, in screen space
+              const hx = V.sx((sel.x + sel.w) * DCELL), hy = V.sy((sel.y + sel.h) * DCELL);
+              if (Math.abs(p.x - hx) < 9 && Math.abs(p.y - hy) < 9) {
+                S.ddrag = { type: "resize", box: sel, undone: false };
+                return;
+              }
+            }
+            const b = boxAt(det, s.x, s.y);
+            S.dsel = b ? b.id : null;
+            if (b) S.ddrag = { type: "movebox", box: b, start: s, ox: b.x, oy: b.y, undone: false };
+            renderDetailInspector();
+            needsDraw = true;
+          }
+        });
+
+        dCanvas.addEventListener("pointermove", (e) => {
+          const V = makeView(S.dcam, DW, DH);
+          const p = dEvPos(e);
+          const s = dSubAt(V, p);
+          const det = detailData(S.detailRoomId);
+          const d = S.ddrag;
+          if (!d) return;
+
+          if (d.type === "pan") {
+            S.dcam.x -= (p.x - d.last.x) / S.dcam.zoom;
+            S.dcam.y -= (p.y - d.last.y) / S.dcam.zoom;
+            d.last = p;
+            needsDraw = true;
+          } else if (d.type === "box") {
+            d.b = s;
+            needsDraw = true;
+          } else if (d.type === "erase") {
+            const b = boxAt(det, s.x, s.y);
+            if (b) {
+              if (!d.undone) { pushUndo(); d.undone = true; }
+              det.boxes = det.boxes.filter((x) => x !== b);
+              commit();
+            }
+          } else if (d.type === "movebox") {
+            const nx = d.ox + (s.x - d.start.x), ny = d.oy + (s.y - d.start.y);
+            if (nx !== d.box.x || ny !== d.box.y) {
+              if (!d.undone) { pushUndo(); d.undone = true; }
+              d.box.x = nx; d.box.y = ny;
+              needsDraw = true;
+              scheduleSave();
+            }
+          } else if (d.type === "resize") {
+            const nw = Math.max(1, s.x - d.box.x + 1), nh = Math.max(1, s.y - d.box.y + 1);
+            if (nw !== d.box.w || nh !== d.box.h) {
+              if (!d.undone) { pushUndo(); d.undone = true; }
+              d.box.w = nw; d.box.h = nh;
+              needsDraw = true;
+              scheduleSave();
+            }
+          }
+        });
+
+        function endDDrag() {
+          const d = S.ddrag;
+          if (!d) return;
+          if (d.type === "box") {
+            const r = normRect(d.a, d.b);
+            pushUndo();
+            const box = { id: uid("box"), x: r.x, y: r.y, w: r.w, h: r.h, type: S.dtype, label: "" };
+            detailData(S.detailRoomId).boxes.push(box);
+            S.dsel = box.id;
+            commit();
+            renderDetailInspector();
+          }
+          S.ddrag = null;
+          needsDraw = true;
+          flushUI();
+        }
+        dCanvas.addEventListener("pointerup", endDDrag);
+        dCanvas.addEventListener("pointercancel", endDDrag);
+        dCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
+        dCanvas.addEventListener(
+          "wheel",
+          (e) => {
+            e.preventDefault();
+            const V = makeView(S.dcam, DW, DH);
+            const p = dEvPos(e);
+            zoomAt(S.dcam, p.x, p.y, Math.pow(0.999, e.deltaY), V);
+            needsDraw = true;
+          },
+          { passive: false }
+        );
+
+        const DTOOL_KEYS = { b: "box", v: "select", e: "erase", h: "pan" };
+        function detailKey(e) {
+          if (e.key === "Escape") { S.dsel ? ((S.dsel = null), renderDetailInspector(), (needsDraw = true)) : closeDetail(); return; }
+          if (e.key === "f") { fitDetail(); return; }
+          const t = DTOOL_KEYS[e.key.toLowerCase()];
+          if (t) { setDTool(t); return; }
+          const n = parseInt(e.key, 10);
+          if (n >= 1 && n <= 9 && BOX_TYPES[n - 1]) {
+            S.dtype = BOX_TYPES[n - 1].id;
+            renderTypePalette();
+            needsDraw = true;
+            return;
+          }
+          if (e.key === "Delete" || e.key === "Backspace") {
+            if (!S.dsel) return;
+            pushUndo();
+            const det = detailData(S.detailRoomId);
+            det.boxes = det.boxes.filter((b) => b.id !== S.dsel);
+            S.dsel = null;
+            commit();
+            renderDetailInspector();
+          }
+        }
+
+        function renderDetailInspector() {
+          const host = $("#detail-inspector");
+          if (!S.dsel || !S.detailRoomId) { host.hidden = true; return; }
+          const det = detailData(S.detailRoomId);
+          const b = det.boxes.find((x) => x.id === S.dsel);
+          if (!b) { host.hidden = true; return; }
+          host.hidden = false;
+          host.innerHTML = `
+            <div class="insp-title"><span class="swatch" style="background:${boxType(b.type).color}"></span>
+              <span class="kind">${esc(boxType(b.type).name)}</span></div>
+            <div class="fld"><label>Type</label><select id="d-type">${BOX_TYPES.map(
+              (t) => `<option value="${t.id}" ${t.id === b.type ? "selected" : ""}>${t.name}</option>`
+            ).join("")}</select></div>
+            <div class="fld"><label>Label</label><input type="text" id="d-label" value="${esc(b.label)}" placeholder="optional" /></div>
+            <div class="meta">${b.w}×${b.h} sub-cells at ${b.x}, ${b.y}</div>
+            <div class="btn-row"><button class="btn danger" id="d-del">Delete</button></div>`;
+          $("#d-type").onchange = (e) => {
+            pushUndo(); b.type = e.target.value; S.dtype = b.type;
+            renderTypePalette(); commit(); renderDetailInspector();
+          };
+          $("#d-label").oninput = (e) => { b.label = e.target.value; needsDraw = true; scheduleSave(); };
+          undoOnFocus($("#d-label"));
+          $("#d-del").onclick = () => {
+            pushUndo();
+            det.boxes = det.boxes.filter((x) => x.id !== b.id);
+            S.dsel = null;
+            commit();
+            renderDetailInspector();
+          };
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           15 · Import / export
+           ══════════════════════════════════════════════════════════════ */
+        function exportJSON() {
+          S.doc.updated = Date.now();
+          const blob = new Blob([JSON.stringify(S.doc, null, 2)], { type: "application/json" });
+          saveBlob(blob, slug(S.doc.name) + ".mvmap.json");
+        }
+        $("#btn-export").onclick = exportJSON;
+        $("#btn-import").onclick = () => $("#file-input").click();
+        $("#file-input").onchange = (e) => {
+          const f = e.target.files && e.target.files[0];
+          if (!f) return;
+          const rd = new FileReader();
+          rd.onload = () => {
+            try {
+              const d = migrate(JSON.parse(rd.result));
+              d.id = uid("map"); // import as a new map, never clobber
+              loadDoc(d);
+            } catch (err) {
+              alert("Could not read that file: " + err.message);
+            }
+          };
+          rd.readAsText(f);
+          e.target.value = "";
+        };
+
+        function exportPNG() {
+          const b = docBBox();
+          if (!b) { alert("Nothing to export yet."); return; }
+          const pad = 1;
+          const cols = b.x1 - b.x0 + 1 + pad * 2, rows = b.y1 - b.y0 + 1 + pad * 2;
+          const scale = clamp(Math.floor(4096 / Math.max(cols, rows)), 8, 48);
+          const w = cols * scale, h = rows * scale;
+          const c = document.createElement("canvas");
+          c.width = w; c.height = h;
+          const cx = c.getContext("2d");
+          const cam = {
+            x: (b.x0 - pad + cols / 2) * CELL,
+            y: (b.y0 - pad + rows / 2) * CELL,
+            zoom: scale / CELL,
+          };
+          drawWorld(cx, makeView(cam, w, h), { cursor: false, bg: "#12151b", labels: S.showLabels });
+          c.toBlob((blob) => saveBlob(blob, slug(S.doc.name) + ".png"), "image/png");
+        }
+        $("#btn-png").onclick = exportPNG;
+
+        /* ══════════════════════════════════════════════════════════════
+           16 · Documents
+           ══════════════════════════════════════════════════════════════ */
+        function loadDoc(d) {
+          S.doc = migrate(d);
+          S.sel = null;
+          S.activeRoomId = null;
+          S.activeAreaId = S.doc.areas[0].id;
+          undoStack.length = 0;
+          redoStack.length = 0;
+          closeDetail();
+          $("#map-name").value = S.doc.name;
+          commit();
+          fitWorld();
+        }
+        $("#btn-new").onclick = () => {
+          if (S.doc.rooms.length && !confirm("Start a new map? The current one stays saved in your library.")) return;
+          loadDoc(newDoc());
+        };
+
+        /* ══════════════════════════════════════════════════════════════
+           17 · Modals
+           ══════════════════════════════════════════════════════════════ */
+        function openModal(html) {
+          $("#modal-box").innerHTML = html;
+          $("#modal").hidden = false;
+        }
+        function closeModal() { $("#modal").hidden = true; }
+        $("#modal").addEventListener("click", (e) => {
+          if (e.target.id === "modal" || e.target.dataset.close != null) closeModal();
+        });
+
+        $("#btn-help").onclick = () => {
+          openModal(`
+            <h2>MVMap — Metroidvania Map Editor</h2>
+            <p>A tool for laying out metroidvania worlds: paint rooms onto grid paper, colour them by area,
+               connect them with doors, and model progression with locks and keys.</p>
+            <h3>Locks &amp; keys</h3>
+            <p>The core metroidvania principle is that the map is non-linear and gated. New areas are
+               <em>locked</em>, and the player must find a <em>key</em> elsewhere to get through. A key is rarely a
+               literal key — it's a movement ability, an item, or a story beat. One lock can have several keys,
+               and one key can open many locks.</p>
+            <p>Place a door on a cell edge, assign it a lock, then tick which keys open that lock. Selecting a
+               lock or key draws the links between them, so you can read the progression flow at a glance.
+               A lock with doors but no keys is flagged as a soft-lock.</p>
+            <h3>Grey-boxing a room</h3>
+            <p>Double-click any room (or press <b>Enter</b> with it selected) to open a subdivided grid for that
+               room, and block out its interior with typed boxes — solid, platform, hazard, water, ladder, exit,
+               item, enemy, note. Doors on the room's border are drawn as anchors.</p>
+            <h3>Storage</h3>
+            <p>Maps autosave to your browser (IndexedDB, or localStorage when that isn't available). Use
+               <b>Export</b> for a portable <code>.json</code> file and <b>PNG</b> for an image of the whole map.</p>
+            <h3>Map shortcuts</h3>
+            <div class="kbd-grid">
+              <b>V</b><span>Select / move</span>
+              <b>B</b><span>Paint cells</span>
+              <b>R</b><span>Rectangle fill</span>
+              <b>E</b><span>Erase cells</span>
+              <b>D</b><span>Door</span>
+              <b>K</b><span>Key</span>
+              <b>H / Space</b><span>Pan</span>
+              <b>Shift + paint</b><span>Start a new room</span>
+              <b>Alt + paint</b><span>Erase instead</span>
+              <b>F</b><span>Zoom to fit</span>
+              <b>Enter</b><span>Grey-box selected room</span>
+              <b>Del</b><span>Delete selection</span>
+              <b>Ctrl + Z / Y</b><span>Undo / redo</span>
+              <b>Ctrl + S</b><span>Export JSON</span>
+            </div>
+            <h3>Grey-box shortcuts</h3>
+            <div class="kbd-grid">
+              <b>B</b><span>Draw box</span>
+              <b>V</b><span>Select / move / resize</span>
+              <b>E</b><span>Erase box</span>
+              <b>1–9</b><span>Pick box type</span>
+              <b>Esc</b><span>Deselect, then back to map</span>
+            </div>
+            <div class="close-row"><button class="btn primary" data-close style="flex:0 0 auto;padding:6px 16px">Close</button></div>`);
+        };
+
+        $("#btn-maps").onclick = async () => {
+          const all = (await Store.all()).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+          const rows = all.length
+            ? all
+                .map((d) => {
+                  const when = d.updated ? new Date(d.updated).toLocaleString() : "—";
+                  return `<div class="map-row">
+                      <span class="nm"><b>${esc(d.name || "Untitled")}</b>${
+                    d.id === S.doc.id ? ' <span class="sub">— open</span>' : ""
+                  }<br /><span class="sub">${(d.rooms || []).length} rooms · ${(d.locks || []).length} locks · ${when}</span></span>
+                      <button class="btn" data-open="${d.id}" style="flex:0 0 auto;padding:4px 12px">Open</button>
+                      <button class="btn danger" data-delmap="${d.id}" style="flex:0 0 auto;padding:4px 12px">Delete</button>
+                    </div>`;
+                })
+                .join("")
+            : `<p>No saved maps yet.</p>`;
+          openModal(`<h2>Saved maps</h2><p class="sub">Stored via ${
+            Store.mode === "idb" ? "IndexedDB" : "localStorage"
+          }.</p>${rows}<div class="close-row"><button class="btn primary" data-close style="flex:0 0 auto;padding:6px 16px">Close</button></div>`);
+
+          $("#modal-box").querySelectorAll("[data-open]").forEach((b) => {
+            b.onclick = () => {
+              const d = all.find((x) => x.id === b.dataset.open);
+              if (d) { loadDoc(d); closeModal(); }
+            };
+          });
+          $("#modal-box").querySelectorAll("[data-delmap]").forEach((b) => {
+            b.onclick = async () => {
+              const id = b.dataset.delmap;
+              const d = all.find((x) => x.id === id);
+              if (!confirm(`Delete “${d ? d.name : "this map"}” permanently?`)) return;
+              await Store.del(id);
+              closeModal();
+              if (id === S.doc.id) loadDoc(newDoc());
+            };
+          });
+        };
+
+        /* ══════════════════════════════════════════════════════════════
+           18 · Boot
+           ══════════════════════════════════════════════════════════════ */
+        (async function boot() {
+          await Store.init();
+          if (Store.mode !== "idb") $("#file-note").classList.add("show");
+
+          let doc = null;
+          try {
+            const lastId = localStorage.getItem("mvmap:last");
+            if (lastId) {
+              const all = await Store.all();
+              doc = all.find((d) => d.id === lastId) || null;
+            }
+          } catch (e) {}
+
+          S.doc = migrate(doc || newDoc());
+          S.activeAreaId = S.doc.areas[0].id;
+          $("#map-name").value = S.doc.name;
+          $("#chk-flow").checked = S.showFlow;
+          $("#chk-labels").checked = S.showLabels;
+          setTool("paint");
+          setDTool("box");
+          renderTypePalette();
+          reindex();
+          renderUI();
+          setStatus("saved");
+
+          const [w, h] = resizeCanvas(worldCanvas, wctx);
+          VW = w; VH = h;
+          if (S.doc.rooms.length) fitWorld();
+          needsDraw = true;
+          requestAnimationFrame(frame);
+        })();
+      })();
+    </script>
+  </body>
+</html>
