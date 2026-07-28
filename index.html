@@ -165,8 +165,11 @@
       .sect-head {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        gap: 6px;
         margin-bottom: 6px;
+      }
+      .sect-head h3 {
+        flex: 1;
       }
       .sect-head h3 {
         margin: 0;
@@ -752,6 +755,7 @@
           <div class="sect-head">
             <h3>Rooms</h3>
             <span class="count" id="room-count">0</span>
+            <button class="mini" id="btn-add-room" title="New room">+</button>
           </div>
           <div id="room-list" class="list"></div>
         </section>
@@ -2105,8 +2109,9 @@
         function renderRooms() {
           const host = $("#room-list");
           $("#room-count").textContent = S.doc.rooms.length;
+          $("#btn-add-room").title = "New room in " + activeArea().name;
           if (!S.doc.rooms.length) {
-            host.innerHTML = `<div class="empty">Pick the Paint tool and drag on the grid.</div>`;
+            host.innerHTML = `<div class="empty">Hit + to start a room, then drag on the grid to paint its cells.</div>`;
             return;
           }
           const selId = S.sel && S.sel.type === "room" ? S.sel.id : null;
@@ -2442,6 +2447,15 @@
           commit(true);
         });
 
+        /** Open a fresh, empty room in `areaId` and arm the Paint tool on it. */
+        function startNewRoom(areaId) {
+          S.activeRoomId = null;
+          S.sel = null;
+          const r = createRoom(areaId);
+          S.sel = { type: "room", id: r.id };
+          setTool("paint");
+          return r;
+        }
         $("#btn-add-area").onclick = () => {
           pushUndo();
           const a = {
@@ -2451,12 +2465,12 @@
           };
           S.doc.areas.push(a);
           S.activeAreaId = a.id;
-          S.activeRoomId = null;
-          S.sel = null;
-          // Open a room in the new area straight away so you can just start drawing.
-          const r = createRoom(a.id);
-          S.sel = { type: "room", id: r.id };
-          setTool("paint");
+          startNewRoom(a.id);
+          commit();
+        };
+        $("#btn-add-room").onclick = () => {
+          pushUndo();
+          startNewRoom(activeArea().id);
           commit();
         };
         $("#btn-add-lock").onclick = () => {
@@ -2973,6 +2987,11 @@
             <h2>MVMap — Metroidvania Map Editor</h2>
             <p>A tool for laying out metroidvania worlds: paint rooms onto grid paper, colour them by area,
                connect them with doors, and model progression with locks and keys.</p>
+            <h3>Rooms</h3>
+            <p>Press <b>+</b> above the room list to open a new room in the active area, then drag on the grid
+               to paint its cells — a room is any set of cells, so L-shapes and corridors are fine.
+               <b>Shift</b>+paint also starts a new room without leaving the canvas. Adding an area opens a
+               room in it automatically.</p>
             <h3>Locks &amp; keys</h3>
             <p>The core metroidvania principle is that the map is non-linear and gated. New areas are
                <em>locked</em>, and the player must find a <em>key</em> elsewhere to get through. A key is rarely a
